@@ -24,6 +24,7 @@ jobs:
           
     - name: Use tag
       run: echo ${{steps.tag.outputs.tag}}
+    # TODO: How can I make use of `npm run docusaurus docs:version ${{steps.tag.outputs.tag}}` to get it to correctly version before deploying
     - name: Docusaurus BuildDeploy Action
       uses: redkubes/docusaurus-deploy-action@v1.2
       with:
