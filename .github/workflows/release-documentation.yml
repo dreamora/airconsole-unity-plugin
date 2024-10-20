@@ -1,0 +1,32 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v*'
+      
+jobs:
+  generate-and-deploy:
+
+    name: Generate and deploy GH Page
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get current git tag
+    # You may pin to the exact commit or the version.
+    # uses: devops-actions/action-get-tag@4e13c4ea459efa2988a10d5ff0f252bb097929ef
+      uses: devops-actions/action-get-tag@v1.0.2
+      with:
+        # Whether to strip "v" from the tag or not (optional)
+        strip_v: true # optional
+        # Set default version (optional)
+        # default: # optional
+          
+    - name: Use tag
+      run: echo ${{steps.tag.outputs.tag}}
+    - name: Docusaurus BuildDeploy Action
+      uses: redkubes/docusaurus-deploy-action@v1.2
+      with:
+          source-folder: documentation
+          deployment-branch: gh-pages
+            
