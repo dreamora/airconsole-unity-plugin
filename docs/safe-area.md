@@ -33,29 +33,29 @@ using NDream.AirConsole;
 
 public class SafeAreaHandler : MonoBehaviour
 {
-    [SerializeField] 
-    private Camera mainCamera;
-    
+    [SerializeField]
+    private Camera _mainCamera;
+
     void Start()
     {
         // Register for safe area changes
         if (AirConsole.instance && AirConsole.instance.IsAirConsoleUnityPluginReady()) {
             // Apply the current safe area if available
             HandleSafeAreaChanged(AirConsole.instance.SafeArea);
-            
+
             // Subscribe to future changes
             AirConsole.instance.OnSafeAreaChanged += HandleSafeAreaChanged;
         }
     }
-    
+
     private void HandleSafeAreaChanged(Rect newSafeArea)
     {
         // Adjust your camera's viewport or UI elements based on the safe area
-        if (mainCamera != null) {
-            mainCamera.pixelRect = newSafeArea;
+        if (_mainCamera) {
+            _mainCamera.pixelRect = newSafeArea;
         }
     }
-    
+
     void OnDestroy()
     {
         // Always unsubscribe when done
@@ -70,10 +70,10 @@ public class SafeAreaHandler : MonoBehaviour
 
 The `AirConsole.instance.SafeArea` property returns a `Rect` structure with the following properties:
 
-- `x`: The x-coordinate of the lower-left corner of the safe area
-- `y`: The y-coordinate of the lower-left corner of the safe area
-- `width`: The width of the safe area
-- `height`: The height of the safe area
+- `x`: The x-coordinate represents the horizontal position as measured from the left border of the screen.
+- `y`: The y-coordinate represents the vertical position as measured from the bottom border of the screen.
+- `width`: The width of the safe area.
+- `height`: The height of the safe area.
 
 All values are provided in pixel coordinates, making it easy to apply to camera `pixelRect` properties.
 
@@ -138,8 +138,9 @@ Enabling this option is required for automotive platforms and recommended for al
 
 ## Further Examples
 
-For more detailed examples, check out the example scenes included in the plugin under `Assets/AirConsole/examples/safe-area/`:
+For more detailed examples, check out the example scenes included in the plugin under [Assets/AirConsole/examples/safe-area/](../Assets/AirConsole/examples/safe-area/README.md):
 
 - Basic Example: Shows how to use safe area with a fullscreen camera
 - UI Example: Demonstrates safe area handling with UI elements and canvas scaling
 - Split Screen Example: Showcases complex safe area division for multiplayer games
+
