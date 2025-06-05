@@ -578,7 +578,11 @@ namespace NDream.AirConsole {
 
             if (GetDevice(GetDeviceId()) != null) {
                 try {
-                    return Settings.AIRCONSOLE_PROFILE_PICTURE_URL + (string)GetDevice(device_id)["uid"] + "&size=" + size;
+                    var device = GetDevice(device_id);
+                    var uid = device?["uid"]?.ToString();
+                    if (uid != null) {
+                        return Settings.AIRCONSOLE_PROFILE_PICTURE_URL + uid + "&size=" + size;
+                    }
                 } catch (Exception) {
                     if (Settings.debug.warning) {
                         Debug.LogWarning("AirConsole: GetProfilePicture: can't find profile picture of device_id:" + device_id);
@@ -744,7 +748,7 @@ namespace NDream.AirConsole {
             string game_url = GetGameUrl(_location);
             for (int i = 1; i < _devices.Count; ++i) {
                 JToken device = GetDevice(i);
-                if (device != null && GetGameUrl((string)device["location"]) == game_url) {
+                if (device != null && GetGameUrl(device["location"]?.ToString()) == game_url) {
                     result.Add(i);
                 }
             }
@@ -1362,7 +1366,7 @@ namespace NDream.AirConsole {
             _device_id = (int)msg["device_id"];
 
             // parse location
-            _location = (string)msg["location"];
+            _location = msg["location"]?.ToString() ?? "";
 
             if (msg["translations"] != null) {
                 _translations = new Dictionary<string, string>();
@@ -1388,7 +1392,7 @@ namespace NDream.AirConsole {
             if (onReady != null) {
                 eventQueue.Enqueue(delegate() {
                     if (onReady != null) {
-                        onReady((string)msg["code"]);
+                        onReady(msg["code"]?.ToString() ?? "");
                     }
                 });
             }
@@ -1541,7 +1545,7 @@ namespace NDream.AirConsole {
 
         private void OnPersistentDataStored(JObject msg) {
             try {
-                string uid = (string)msg["uid"];
+                string uid = msg["uid"]?.ToString();
 
                 if (onPersistentDataStored != null) {
                     eventQueue.Enqueue(delegate() {
@@ -1743,7 +1747,7 @@ namespace NDream.AirConsole {
         }
 
         private JToken GetDevice(int deviceId) {
-            if (deviceId < _devices.Count && deviceId >= 0) {
+            if (_devices != null && deviceId < _devices.Count && deviceId >= 0) {
                 return _devices[deviceId];
             }
 
@@ -1848,10 +1852,10 @@ namespace NDream.AirConsole {
 
         private void OnLaunchApp(JObject msg) {
             Debug.Log("onLaunchApp");
-            string gameId = (string)msg["game_id"];
-            string gameVersion = (string)msg["game_version"];
+            string gameId = msg["game_id"]?.ToString();
+            string gameVersion = msg["game_version"]?.ToString();
 
-            if (gameId != Application.identifier || gameVersion != instance.androidTvGameVersion) {
+            if (!string.IsNullOrEmpty(gameId) && (gameId != Application.identifier || gameVersion != instance.androidTvGameVersion)) {
                 bool quitAfterLaunchIntent = false; // Flag used to force old pre v2.5 way of quitting
 
                 if (msg["quit_after_launch_intent"] != null) {
