@@ -1759,8 +1759,16 @@ namespace NDream.AirConsole {
                 return null;
             }
 
-            url = url.Split('#')[0];
-            url = url.Split('?')[0];
+            string[] hashParts = url.Split('#');
+            if (hashParts.Length > 0) {
+                url = hashParts[0];
+            }
+            
+            string[] queryParts = url.Split('?');
+            if (queryParts.Length > 0) {
+                url = queryParts[0];
+            }
+            
             if (url.EndsWith("screen.html")) {
                 url = url.Substring(0, url.Length - 11);
             } else if (url.EndsWith("controller.html")) {
@@ -1787,8 +1795,11 @@ namespace NDream.AirConsole {
         }
 
         private string ComputeUrlVersion(string version) {
-            var split = version.Split('.');
-            return $"{split[0]}.{split[1]}{split[2]}";
+            var split = version?.Split('.');
+            if (split != null && split.Length >= 3) {
+                return $"{split[0]}.{split[1]}{split[2]}";
+            }
+            return version ?? "";
         }
 
         private void InitWebView() {
