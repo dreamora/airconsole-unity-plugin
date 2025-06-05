@@ -54,8 +54,10 @@ namespace NDream.AirConsole.Editor {
 		public void ClientListener () {
 			while (true) {
 				try {
-					request = listener.GetContext ();
-					ThreadPool.QueueUserWorkItem (ProcessRequest, request);
+					if (listener != null) {
+						request = listener.GetContext ();
+						ThreadPool.QueueUserWorkItem (ProcessRequest, request);
+					}
 				} catch (ThreadAbortException) {
 					// ThreadAbortException is thrown when the webserver gets stopped/restarted
 				} catch (Exception e) {
@@ -68,19 +70,30 @@ namespace NDream.AirConsole.Editor {
 
 		public void ProcessRequest (object listenerContext) {
 			try {
+				if (listenerContext == null) {
+					return;
+				}
+				
 				var context = (HttpListenerContext)listenerContext;
+				if (context?.Request?.RawUrl == null) {
+					return;
+				}
+				
 				string rawUrl = context.Request.RawUrl;
 
 				// conditions if editor version gets called
-				if (startUpPath.Contains (Settings.WEBTEMPLATE_PATH)) {
+				if (!string.IsNullOrEmpty(startUpPath) && startUpPath.Contains (Settings.WEBTEMPLATE_PATH)) {
 					// remove query parameters
-					rawUrl = rawUrl.Split ('?') [0];
+					string[] urlParts = rawUrl.Split ('?');
+					if (urlParts.Length > 0) {
+						rawUrl = urlParts[0];
+					}
 					// translate screen.html to index.html
 					rawUrl = rawUrl.Replace ("screen.html", "index.html");
 				}
 
 				string filename = Path.GetFileName (rawUrl);
-				string path = startUpPath + System.Uri.UnescapeDataString(rawUrl);;
+				string path = startUpPath + System.Uri.UnescapeDataString(rawUrl ?? "");;
 
 				byte[] msg;
 

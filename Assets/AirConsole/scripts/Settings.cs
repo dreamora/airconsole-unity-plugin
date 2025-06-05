@@ -42,7 +42,15 @@ namespace NDream.AirConsole {
         
 
         private static bool IsUnity6OrHigher() {
-            return int.Parse(Application.unityVersion.Split('.')[0]) >= 6000;
+            try {
+                var versionParts = Application.unityVersion?.Split('.');
+                if (versionParts != null && versionParts.Length > 0 && int.TryParse(versionParts[0], out int majorVersion)) {
+                    return majorVersion >= 6000;
+                }
+            } catch {
+                // Fallback in case of any parsing issues
+            }
+            return false;
         }
     }
 }
