@@ -308,6 +308,11 @@ namespace NDream.AirConsole {
 
             List<int> device_ids = GetControllerDeviceIds();
             _players.Clear();
+            
+            if (device_ids == null) {
+                return;
+            }
+            
             if (max_players == -1) {
                 max_players = device_ids.Count;
             }
@@ -338,7 +343,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="player_number">Player Number.</param>
         public int ConvertPlayerNumberToDeviceId(int player_number) {
-            if (player_number >= 0 && player_number < _players.Count) {
+            if (_players != null && player_number >= 0 && player_number < _players.Count) {
                 return _players[player_number];
             }
 
@@ -376,7 +381,7 @@ namespace NDream.AirConsole {
                 return null;
             }
 
-            return (string)device["uid"];
+            return device["uid"]?.ToString();
         }
 
         /// <summary>
@@ -393,9 +398,10 @@ namespace NDream.AirConsole {
                 device_id = GetDeviceId();
             }
 
-            if (GetDevice(device_id) != null) {
+            var device = GetDevice(device_id);
+            if (device != null) {
                 try {
-                    return GetDevice(device_id)["custom"];
+                    return device["custom"];
                 } catch (Exception e) {
                     if (Settings.debug.error) {
                         Debug.LogError("AirConsole: " + e.Message);
@@ -425,10 +431,12 @@ namespace NDream.AirConsole {
                 device_id = GetDeviceId();
             }
 
-            if (GetDevice(device_id) != null) {
+            var device = GetDevice(device_id);
+            if (device != null) {
                 try {
-                    if (GetDevice(device_id)["nickname"] != null) {
-                        return (string)GetDevice(device_id)["nickname"];
+                    var nickname = device["nickname"];
+                    if (nickname != null) {
+                        return nickname.ToString();
                     } else {
                         return "Guest " + device_id;
                     }
@@ -457,8 +465,9 @@ namespace NDream.AirConsole {
                 device_id = GetDeviceId();
             }
 
-            if (GetDevice(device_id) != null) {
-                return (string)GetDevice(device_id)["language"];
+            var device = GetDevice(device_id);
+            if (device != null) {
+                return device["language"]?.ToString();
             } else {
                 if (Settings.debug.warning) {
                     Debug.LogWarning("AirConsole: GetLanguage: device_id " + device_id);
@@ -475,19 +484,23 @@ namespace NDream.AirConsole {
         /// <param name="id">The id of the translation string.</param>
         /// <param name="id">Values that should be used for replacement in the translated string. E.g. if a translated string is "Hi %name%" and values is {"name": "Tom"} then this will be replaced to "Hi Tom".</param>
         public string GetTranslation(string id, Dictionary<string, string> values = null) {
+            if (string.IsNullOrEmpty(id)) {
+                return null;
+            }
+            
             string result = null;
 
             if (_translations != null) {
                 if (_translations.ContainsKey(id)) {
                     result = _translations[id];
 
-                    if (values != null) {
+                    if (values != null && result != null) {
                         string[] parts = result.Split('%');
 
                         for (int i = 1; i < parts.Length; i += 2) {
                             if (parts[i].Length > 0) {
                                 if (values.ContainsKey(parts[i])) {
-                                    parts[i] = values[parts[i]];
+                                    parts[i] = values[parts[i]] ?? "";
                                 } else {
                                     parts[i] = "";
                                 }
@@ -565,7 +578,11 @@ namespace NDream.AirConsole {
 
             if (GetDevice(GetDeviceId()) != null) {
                 try {
-                    return Settings.AIRCONSOLE_PROFILE_PICTURE_URL + (string)GetDevice(device_id)["uid"] + "&size=" + size;
+                    var device = GetDevice(device_id);
+                    var uid = device?["uid"]?.ToString();
+                    if (uid != null) {
+                        return Settings.AIRCONSOLE_PROFILE_PICTURE_URL + uid + "&size=" + size;
+                    }
                 } catch (Exception) {
                     if (Settings.debug.warning) {
                         Debug.LogWarning("AirConsole: GetProfilePicture: can't find profile picture of device_id:" + device_id);
@@ -731,7 +748,7 @@ namespace NDream.AirConsole {
             string game_url = GetGameUrl(_location);
             for (int i = 1; i < _devices.Count; ++i) {
                 JToken device = GetDevice(i);
-                if (device != null && GetGameUrl((string)device["location"]) == game_url) {
+                if (device != null && GetGameUrl(device["location"]?.ToString()) == game_url) {
                     result.Add(i);
                 }
             }
@@ -1349,7 +1366,7 @@ namespace NDream.AirConsole {
             _device_id = (int)msg["device_id"];
 
             // parse location
-            _location = (string)msg["location"];
+            _location = msg["location"]?.ToString() ?? "";
 
             if (msg["translations"] != null) {
                 _translations = new Dictionary<string, string>();
@@ -1375,7 +1392,7 @@ namespace NDream.AirConsole {
             if (onReady != null) {
                 eventQueue.Enqueue(delegate() {
                     if (onReady != null) {
-                        onReady((string)msg["code"]);
+                        onReady(msg["code"]?.ToString() ?? "");
                     }
                 });
             }
@@ -1528,7 +1545,7 @@ namespace NDream.AirConsole {
 
         private void OnPersistentDataStored(JObject msg) {
             try {
-                string uid = (string)msg["uid"];
+                string uid = msg["uid"]?.ToString();
 
                 if (onPersistentDataStored != null) {
                     eventQueue.Enqueue(delegate() {
@@ -1730,7 +1747,7 @@ namespace NDream.AirConsole {
         }
 
         private JToken GetDevice(int deviceId) {
-            if (deviceId < _devices.Count && deviceId >= 0) {
+            if (_devices != null && deviceId < _devices.Count && deviceId >= 0) {
                 return _devices[deviceId];
             }
 
@@ -1742,8 +1759,16 @@ namespace NDream.AirConsole {
                 return null;
             }
 
-            url = url.Split('#')[0];
-            url = url.Split('?')[0];
+            string[] hashParts = url.Split('#');
+            if (hashParts.Length > 0) {
+                url = hashParts[0];
+            }
+            
+            string[] queryParts = url.Split('?');
+            if (queryParts.Length > 0) {
+                url = queryParts[0];
+            }
+            
             if (url.EndsWith("screen.html")) {
                 url = url.Substring(0, url.Length - 11);
             } else if (url.EndsWith("controller.html")) {
@@ -1770,8 +1795,11 @@ namespace NDream.AirConsole {
         }
 
         private string ComputeUrlVersion(string version) {
-            var split = version.Split('.');
-            return $"{split[0]}.{split[1]}{split[2]}";
+            var split = version?.Split('.');
+            if (split != null && split.Length >= 3) {
+                return $"{split[0]}.{split[1]}{split[2]}";
+            }
+            return version ?? "";
         }
 
         private void InitWebView() {
@@ -1835,10 +1863,10 @@ namespace NDream.AirConsole {
 
         private void OnLaunchApp(JObject msg) {
             Debug.Log("onLaunchApp");
-            string gameId = (string)msg["game_id"];
-            string gameVersion = (string)msg["game_version"];
+            string gameId = msg["game_id"]?.ToString();
+            string gameVersion = msg["game_version"]?.ToString();
 
-            if (gameId != Application.identifier || gameVersion != instance.androidTvGameVersion) {
+            if (!string.IsNullOrEmpty(gameId) && (gameId != Application.identifier || gameVersion != instance.androidTvGameVersion)) {
                 bool quitAfterLaunchIntent = false; // Flag used to force old pre v2.5 way of quitting
 
                 if (msg["quit_after_launch_intent"] != null) {
@@ -1879,7 +1907,9 @@ namespace NDream.AirConsole {
                 up.Dispose();
                 ca.Dispose();
                 packageManager.Dispose();
-                launchIntent.Dispose();
+                if (launchIntent != null) {
+                    launchIntent.Dispose();
+                }
 
                 // Quitting after launch intent was the pre v2.5 way
                 if (quitAfterLaunchIntent) {
@@ -1890,21 +1920,23 @@ namespace NDream.AirConsole {
 
         private void OnUnityWebviewResize(JObject msg) {
             Debug.Log("OnUnityWebviewResize");
-            if (_devices.Count > 0) {
+            if (_devices != null && _devices.Count > 0 && _devices[0] != null) {
                 Debug.Log("screen device data: " + _devices[0].ToString());
             }
 
             int h = Screen.height;
 
-            if (msg["top_bar_height"] != null) {
+            if (msg?["top_bar_height"] != null) {
                 h = (int)msg["top_bar_height"] * 2;
                 webViewHeight = h;
             }
 
-            webViewObject.SetMargins(0, 0, 0, defaultScreenHeight - webViewHeight);
+            webViewObject?.SetMargins(0, 0, 0, defaultScreenHeight - webViewHeight);
             if (androidUIResizeMode == AndroidUIResizeMode.ResizeCamera
                 || androidUIResizeMode == AndroidUIResizeMode.ResizeCameraAndReferenceResolution) {
-                Camera.main.pixelRect = new Rect(0, 0, Screen.width, Screen.height - GetScaledWebViewHeight());
+                if (Camera.main != null) {
+                    Camera.main.pixelRect = new Rect(0, 0, Screen.width, Screen.height - GetScaledWebViewHeight());
+                }
             }
         }
 
@@ -1919,23 +1951,26 @@ namespace NDream.AirConsole {
 
             if (androidUIResizeMode == AndroidUIResizeMode.ResizeCamera
                 || androidUIResizeMode == AndroidUIResizeMode.ResizeCameraAndReferenceResolution) {
-                Camera.main.pixelRect = new Rect(0, 0, Screen.width, Screen.height - GetScaledWebViewHeight());
+                if (Camera.main != null) {
+                    Camera.main.pixelRect = new Rect(0, 0, Screen.width, Screen.height - GetScaledWebViewHeight());
+                }
             }
 
             if (androidUIResizeMode == AndroidUIResizeMode.ResizeCameraAndReferenceResolution) {
                 UnityEngine.UI.CanvasScaler[] allCanvasScalers = FindObjectsOfType<UnityEngine.UI.CanvasScaler>();
 
-                for (int i = 0; i < allCanvasScalers.Length; ++i) {
-                    if (fixedCanvasScalers.Contains(allCanvasScalers[i])) {
-                        continue;
-                    }
+                if (allCanvasScalers != null) {
+                    for (int i = 0; i < allCanvasScalers.Length; ++i) {
+                        if (allCanvasScalers[i] == null || fixedCanvasScalers.Contains(allCanvasScalers[i])) {
+                            continue;
+                        }
 
-                    allCanvasScalers[i].referenceResolution =
-                        new Vector2(allCanvasScalers[i].referenceResolution.x,
-                            allCanvasScalers[i].referenceResolution.y
-                            / (allCanvasScalers[i].referenceResolution.y - GetScaledWebViewHeight())
-                            * allCanvasScalers[i].referenceResolution.y);
-                    fixedCanvasScalers.Add(allCanvasScalers[i]);
+                        allCanvasScalers[i].referenceResolution =
+                            new Vector2(allCanvasScalers[i].referenceResolution.x,
+                                allCanvasScalers[i].referenceResolution.y
+                                / (allCanvasScalers[i].referenceResolution.y - GetScaledWebViewHeight())
+                                * allCanvasScalers[i].referenceResolution.y);
+                        fixedCanvasScalers.Add(allCanvasScalers[i]);
                 }
             }
         }

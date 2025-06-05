@@ -98,13 +98,22 @@ namespace NDream.AirConsole.Editor {
         }
 
         private static void UpdateAndroidPlayerSettings() {
-            SerializedObject playerSettings = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")[0]);
+            var assets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
+            if (assets == null || assets.Length == 0) {
+                return;
+            }
+            
+            SerializedObject playerSettings = new SerializedObject(assets[0]);
 
             SerializedProperty filterTouchesProperty = playerSettings.FindProperty("AndroidFilterTouchesWhenObscured");
-            filterTouchesProperty.boolValue = false;
+            if (filterTouchesProperty != null) {
+                filterTouchesProperty.boolValue = false;
+            }
 
             SerializedProperty androidGamePadSupportLevel = playerSettings.FindProperty("androidGamepadSupportLevel");
-            androidGamePadSupportLevel.intValue = 0;
+            if (androidGamePadSupportLevel != null) {
+                androidGamePadSupportLevel.intValue = 0;
+            }
 
             playerSettings.ApplyModifiedProperties();
         }
