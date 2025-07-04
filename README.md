@@ -22,7 +22,7 @@ There are more examples on the website: <http://developers.airconsole.com/#/guid
 
 # Platforms
 
-AirConsole supports WebGL and AndroidTV as targets. To make use of this plugin, you need to make sure to switch your target to either WebGL or Android.
+AirConsole supports WebGL, Android TV and Android Automotive as targets. To make use of this plugin, you need to make sure to switch your target to either WebGL or Android. Use `GetAndroidDeviceType()` to adapt your game for the detected device type.
 
 # Support
 
