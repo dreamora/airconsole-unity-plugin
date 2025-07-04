@@ -19,6 +19,7 @@ The upgrade instructions can be found in [Upgrade_Plugin_Version.md](Assets/AirC
 
 All install instructions and examples are documented in the file "Documentation_1.7.0.pdf" inside this folder.
 There are more examples on the website: <http://developers.airconsole.com/#/guides>
+Additional information about the Safe Area feature and example scripts can be found in [docs/safe-area.md](docs/safe-area.md).
 
 # Platforms
 
