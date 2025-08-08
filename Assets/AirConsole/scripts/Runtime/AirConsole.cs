@@ -29,6 +29,26 @@ namespace NDream.AirConsole {
         ResizeCameraAndReferenceResolution
     }
 
+    /// <summary>
+    /// Describes the type of Android device the game is running on.
+    /// </summary>
+    public enum AndroidDeviceType {
+        /// <summary>
+        /// Generic Android device without special UI mode.
+        /// </summary>
+        Normal,
+
+        /// <summary>
+        /// Android TV device.
+        /// </summary>
+        TV,
+
+        /// <summary>
+        /// Android Automotive device.
+        /// </summary>
+        Automotive
+    }
+
     public delegate void OnReady(string code);
 
     public delegate void OnMessage(int from, JToken data);
@@ -2199,6 +2219,30 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <returns>True if the device is a TV device, otherwise false.</returns>
         public bool IsTV() => _pluginManager?.IsTV() ?? false;
+
+        // ReSharper disable once UnusedMember.Global
+        /// <summary>
+        /// Retrieves the type of Android device this game is running on.
+        /// </summary>
+        /// <remarks>
+        /// Returns <see cref="AndroidDeviceType.Normal"/> when the runtime is not Android
+        /// or when no specialized mode could be detected.
+        /// </remarks>
+        public AndroidDeviceType GetAndroidDeviceType() {
+            if (!IsAndroidRuntime || _androidDataProvider == null) {
+                return AndroidDeviceType.Normal;
+            }
+
+            if (_androidDataProvider.IsAutomotiveDevice()) {
+                return AndroidDeviceType.Automotive;
+            }
+
+            if (_androidDataProvider.IsTvDevice()) {
+                return AndroidDeviceType.TV;
+            }
+
+            return AndroidDeviceType.Normal;
+        }
 
         private static float GetFloatFromMessage(JObject msg, string name, int defaultValue) =>
             !string.IsNullOrEmpty((string)msg[name])
