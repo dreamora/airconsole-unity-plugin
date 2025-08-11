@@ -14,6 +14,8 @@ namespace NDream.Unity {
     #endregion Imports
 
     public class Packager {
+        private const string IgnoreFileName = ".airconsoleignore";
+
         [MenuItem("Tools/AirConsole/Unlock Assemblies")]
         public static void UnlockAssemblies() {
             EditorApplication.UnlockReloadAssemblies();
@@ -126,10 +128,8 @@ namespace NDream.Unity {
                 .Append(packagePath);
         }
 
-        private const string IgnoreFileName = ".airconsoleignore";
-
         private static IEnumerable<Regex> LoadIgnorePatterns() {
-            string ignoreFilePath = Path.Combine(Application.dataPath, IgnoreFileName);
+            string ignoreFilePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", IgnoreFileName));
             if (!File.Exists(ignoreFilePath)) {
                 return Enumerable.Empty<Regex>();
             }
@@ -138,7 +138,6 @@ namespace NDream.Unity {
                 .Select(line => line.Trim())
                 .Where(line => !string.IsNullOrEmpty(line) && !line.StartsWith("#"))
                 .Select(pattern => {
-                    // Normalize to Assets/ root
                     if (pattern.StartsWith("/")) {
                         pattern = pattern.Substring(1);
                     }

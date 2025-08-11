@@ -50,7 +50,6 @@ namespace NDream.Unity {
                 AssetDatabase.DeleteAsset($"Assets/AirConsole/{nameof(ProjectCodeUpdater)}.cs");
             }
         }
-
     }
 }
 #endif
