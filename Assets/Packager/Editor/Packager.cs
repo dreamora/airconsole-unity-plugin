@@ -56,6 +56,7 @@ namespace NDream.Unity {
         private static void RemoveAirConsolePreferences() =>
             File.Delete(Path.Combine(Application.dataPath, "AirConsole", "airconsole.prefs"));
 
+
         private static bool VerifyReleaseVersionExists(string version) =>
             File.Exists(Path.GetFullPath(Path.Combine("Builds", $"airconsole-unity-plugin-v{version}.unitypackage")));
 
@@ -115,15 +116,39 @@ namespace NDream.Unity {
             Debug.ClearDeveloperConsole();
         }
 
-        private static void CollectPackageInclusionPaths(string packagePath, out IEnumerable<string> airconsoleDirectories) {
-            airconsoleDirectories = Directory.GetDirectories(Path.Combine(Application.dataPath, "AirConsole"))
-                .Where(it => !it.ToLower().Contains("scripts")
-                             && !it.ToLower().Contains("unity-webview")
-                             && !it.ToLower().Contains("examples"))
-                .Select(it => it.Replace(Application.dataPath, "Assets"));
-            airconsoleDirectories = airconsoleDirectories.Append(packagePath);
-            airconsoleDirectories = airconsoleDirectories.Append($"Assets/AirConsole/{nameof(ProjectCodeUpdater)}.cs");
-            airconsoleDirectories = airconsoleDirectories.Append("Assets/WebGLTemplates");
+        private static void CollectPackageInclusionPaths(string packagePath, out IEnumerable<string> assetPaths) {
+            // Build inclusion list based on ignore patterns, preserving user configs
+            IEnumerable<Regex> ignorePatterns = LoadIgnorePatterns();
+
+            assetPaths = AssetDatabase.GetAllAssetPaths()
+                .Where(path => path.StartsWith("Assets/AirConsole") || path.StartsWith("Assets/WebGLTemplates"))
+                .Where(path => !ignorePatterns.Any(pattern => pattern.IsMatch(path)))
+                .Append(packagePath);
+        }
+
+        private const string IgnoreFileName = ".airconsoleignore";
+
+        private static IEnumerable<Regex> LoadIgnorePatterns() {
+            string ignoreFilePath = Path.Combine(Application.dataPath, IgnoreFileName);
+            if (!File.Exists(ignoreFilePath)) {
+                return Enumerable.Empty<Regex>();
+            }
+
+            return File.ReadAllLines(ignoreFilePath)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrEmpty(line) && !line.StartsWith("#"))
+                .Select(pattern => {
+                    // Normalize to Assets/ root
+                    if (pattern.StartsWith("/")) {
+                        pattern = pattern.Substring(1);
+                    }
+                    if (!pattern.StartsWith("Assets/")) {
+                        pattern = "Assets/" + pattern;
+                    }
+
+                    pattern = Regex.Escape(pattern).Replace("\\*", ".*");
+                    return new Regex("^" + pattern + "$", RegexOptions.IgnoreCase);
+                });
         }
 
         private static string PackageCode() {

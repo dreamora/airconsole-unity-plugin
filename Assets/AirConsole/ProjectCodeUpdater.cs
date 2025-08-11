@@ -4,6 +4,7 @@ namespace NDream.Unity {
     using UnityEditor;
     using UnityEditor.Build;
     using UnityEngine;
+    using NDream.AirConsole;
 
     /// <summary>
     /// This is responsible to guide developers through the possible steps for a project upgrade to 2.6.0.
@@ -50,6 +51,7 @@ namespace NDream.Unity {
                 AssetDatabase.DeleteAsset($"Assets/AirConsole/{nameof(ProjectCodeUpdater)}.cs");
             }
         }
+
     }
 }
 #endif
