@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         unityVersion:
           - 2022.3.62f1
-          # - 6000.0.50f1
+          - 6000.0.50f1
         platform:
           - WebGL
-          # - Android
+          - Android
 
     steps:
     - name: Checkout code
@@ -43,7 +43,7 @@ jobs:
       id: check_release
       run: |
         # Fetch releases from GitHub API
-        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/airconsole/airconsole-unity-plugin/releases")
+        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/dreamora/airconsole-unity-plugin/releases")
 
         # Check if a release with the extracted version exists
         exists=$(echo "$releases" | jq -r --arg version "v${{ env.version }}" '.[] | select(.tag_name == $version) | .tag_name')
@@ -55,38 +55,61 @@ jobs:
           echo "No release with version v${{ env.version }} found."
         fi
 
-    # - uses: actions/cache@v3
-    #   with:
-    #     path: Library
-    #     key: Library-AUP-${{ matrix.platform }}
-    #     restore-keys: |
-    #       Library-AUP-
-    #       Library-
+    - uses: actions/cache@v3
+      with:
+        path: Library
+        key: Library-AUP-${{ matrix.platform }}-${{ matrix.unityVersion }}
+        restore-keys: |
+          Library-AUP-${{ matrix.platform }}-
+          Library-AUP-
+          Library-
     #
-    # - name: Test ${{ matrix.platform }} in ${{ matrix.unityVersion }}
-    #   uses: game-ci/unity-builder@v4
-    #   env:
-    #     UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-    #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-    #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-    #   with:
-    #     unityVersion: ${{ matrix.unityVersion }}
-    #     targetPlatform: ${{ matrix.platform }}
-    #     buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
-    #     allowDirtyBuild: true
+    - name: Test ${{ matrix.platform }} in ${{ matrix.unityVersion }}
+      uses: game-ci/unity-test-runner@v4
+      env:
+        UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        testMode: EditMode
+        checkName: ${{ matrix.platform }} Test Results
 
-    # - name: Validate Build
-    #   run: |
-    #     filepath="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}"
-    #     if [ "${{ matrix.platform }}" == "Android" ]; then
-    #       filepath+=".apk"
-    #     elif [ "${{ matrix.platform }}" == "WebGL" ]; then
-    #       filepath+=".zip"
-    #     fi
-    #     if [ ! -f "$filepath" ]; then
-    #       echo "Build validation failed for ${{ matrix.platform }}"
-    #       exit 1
-    #     fi
+    - name: Build ${{ matrix.platform }} in ${{ matrix.unityVersion }}
+      uses: game-ci/unity-builder@v4
+      env:
+        UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        targetPlatform: ${{ matrix.platform }}
+        buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
+        allowDirtyBuild: true
+
+    - name: Validate Build
+      run: |
+        if [ "${{ matrix.platform }}" == "Android" ]; then
+          filepath="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}.apk"
+          if [ ! -f "$filepath" ]; then
+            echo "Build validation failed for ${{ matrix.platform }}"
+            exit 1
+          fi
+        elif [ "${{ matrix.platform }}" == "WebGL" ]; then
+          webgl_dir="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}"
+          if [ ! -d "$webgl_dir" ]; then
+            echo "WebGL build directory not found: $webgl_dir"
+            exit 1
+          fi
+          # Zip the WebGL build directory
+          cd "Builds/${{ matrix.platform }}"
+          zip -r "release-${{ matrix.unityVersion }}-v${{ env.version }}.zip" "release-${{ matrix.unityVersion }}-v${{ env.version }}/"
+          cd ../..
+          if [ ! -f "Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}.zip" ]; then
+            echo "Failed to create WebGL zip file"
+            exit 1
+          fi
+        fi
 
     - name: Extract release notes
       id: extract-release-notes
@@ -98,49 +121,42 @@ jobs:
     - name: Log Release Notes
       run: echo "Release Notes are ${{ steps.extract-release-notes.outputs.release_notes }}"
 
-    # - name: Generate unitypackage release
-    #   uses: game-ci/unity-builder@v4
-    #   env:
-    #     UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-    #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-    #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-    #   if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.61f1'
-    #   with:
-    #     unityVersion: ${{ matrix.unityVersion }}
-    #     targetPlatform: ${{ matrix.platform }}
-    #     buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
-    #     allowDirtyBuild: true
-    #
-    # - name: Generate Release unity package
-    #   run: |
-    #     unity -quit -batchmode -executeMethod NDream.Unity.Packager.Export -projectPath . # -outputPath Builds/release-${{ github.event.inputs.version }}.unitypackage
-    #
+    - name: Generate unitypackage release
+      uses: game-ci/unity-builder@v4
+      env:
+        UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        targetPlatform: ${{ matrix.platform }}
+        buildMethod: NDream.Unity.Packager.Export
+        allowDirtyBuild: true
+
+    - name: Validate release package
+      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      run: |
+        filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
+        if [ ! -f "$filepath" ]; then
+          echo "Build validation of airconsole-unity-plugin-v${{ env.version }}.unitypackage failed"
+          exit 1
+        fi
+
     # Return License
-    # - name: Return license
-    #   uses: game-ci/unity-return-license@v2
-    #   if: always()
-    #
-    # - name: Validate release package
-    #   if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.61f1'
-    #   run: |
-    #     filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
-    #     if [ ! -f "$filepath" ]; then
-    #       echo "Build validation of airconsole-unity-plugin-v${{ env.version }}unitypackage failed"
-    #       exit 1
-    #     fi
+    - name: Return license
+      uses: game-ci/unity-return-license@v2
+      if: always()
 
-    # - name: Commit and Push
-    #   run: |
-    #     git config user.name "GitHub Actions"
-    #     git config user.email "github-actions@github.com"
-    #     git commit -m "e: Update Release package to v${{ env.version }}"
-    #     git push
-
-    # - name: Create GitHub Release
-    #   uses: softprops/action-gh-release@v1
-    #   if: startsWith(github.ref, 'refs/tags/')
-    #   with:
-    #     files: Builds/release-${{ github.event.inputs.version }}.unitypackage
-    #     body: ${{ steps.extract-release-notes.outputs.release_notes }}
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      with:
+        tag_name: v${{ env.version }}
+        name: Release v${{ env.version }}
+        files: Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage
+        body: ${{ steps.extract-release-notes.outputs.release_notes }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
