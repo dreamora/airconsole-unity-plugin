@@ -72,7 +72,7 @@ jobs:
       if: inputs.dry_run == false
       run: |
         # Fetch releases from GitHub API
-        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/dreamora/airconsole-unity-plugin/releases")
+        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases")
 
         # Check if a release with the extracted version exists
         exists=$(echo "$releases" | jq -r --arg version "v${{ env.version }}" '.[] | select(.tag_name == $version) | .tag_name')
