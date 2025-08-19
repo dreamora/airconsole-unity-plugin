@@ -1,24 +1,52 @@
 name: Create Release
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (skip release creation)'
+        required: false
+        default: false
+        type: boolean
     branches:
       - master
 
 jobs:
   build:
+    name: Build ${{ matrix.platform }} ${{ matrix.unityVersion }}${{ matrix.is_release && ' (Release)' || '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        unityVersion:
-          - 2022.3.62f1
-          - 6000.0.50f1
-        platform:
-          - WebGL
-          - Android
+        include:
+          - unityVersion: 2022.3.62f1
+            platform: WebGL
+            is_release: true
+            generates_package: true
+          - unityVersion: 2022.3.62f1
+            platform: Android
+            is_release: false
+            generates_package: false
+          - unityVersion: 6000.0.50f1
+            platform: WebGL
+            is_release: false
+            generates_package: false
+          - unityVersion: 6000.0.50f1
+            platform: Android
+            is_release: false
+            generates_package: false
 
     steps:
+    - name: Show Configuration
+      run: |
+        echo "=== Build Configuration ==="
+        echo "Unity Version: ${{ matrix.unityVersion }}"
+        echo "Platform: ${{ matrix.platform }}"
+        echo "Is Release: ${{ matrix.is_release }}"
+        echo "Generates Package: ${{ matrix.generates_package }}"
+        echo "Dry Run Mode: ${{ inputs.dry_run }}"
+        echo "=========================="
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -41,6 +69,7 @@ jobs:
 
     - name: Check GitHub Releases
       id: check_release
+      if: inputs.dry_run == false
       run: |
         # Fetch releases from GitHub API
         releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/dreamora/airconsole-unity-plugin/releases")
@@ -54,6 +83,13 @@ jobs:
         else
           echo "No release with version v${{ env.version }} found."
         fi
+
+    - name: Dry Run - Skip Release Check
+      if: inputs.dry_run == true
+      run: |
+        echo "=== DRY RUN MODE ==="
+        echo "Skipping duplicate release check for version v${{ env.version }}"
+        echo "==================="
 
     - uses: actions/cache@v3
       with:
@@ -127,7 +163,7 @@ jobs:
         UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
         UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      if: matrix.generates_package == true
       with:
         unityVersion: ${{ matrix.unityVersion }}
         targetPlatform: ${{ matrix.platform }}
@@ -135,7 +171,7 @@ jobs:
         allowDirtyBuild: true
 
     - name: Validate release package
-      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      if: matrix.generates_package == true
       run: |
         filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
         if [ ! -f "$filepath" ]; then
@@ -150,7 +186,7 @@ jobs:
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
-      if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.62f1'
+      if: matrix.is_release == true && inputs.dry_run == false
       with:
         tag_name: v${{ env.version }}
         name: Release v${{ env.version }}
@@ -160,3 +196,14 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Dry Run - Show Release Info
+      if: matrix.is_release == true && inputs.dry_run == true
+      run: |
+        echo "=== DRY RUN MODE ==="
+        echo "Would create release with:"
+        echo "Tag: v${{ env.version }}"
+        echo "Name: Release v${{ env.version }}"
+        echo "Files: Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
+        echo "Release notes: ${{ steps.extract-release-notes.outputs.release_notes }}"
+        echo "==================="
