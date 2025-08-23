@@ -5,6 +5,13 @@ using UnityEngine.UIElements;
 using UnityEngine.Rendering;
 
 namespace NDream.AirConsole.Editor {
+    /// <summary>
+    /// AirConsole Project Optimizer window that provides visual recommendations 
+    /// for optimizing Unity projects for AirConsole web and Android platforms.
+    /// 
+    /// This tool is based on the recommendations from ProjectConfigurationCheck 
+    /// but presents them in a user-friendly interface with individual apply buttons.
+    /// </summary>
     public class ProjectOptimizer : EditorWindow {
         private ScrollView mainScrollView;
         
@@ -240,7 +247,14 @@ namespace NDream.AirConsole.Editor {
             statusIndicator.style.borderRadius = 8;
             statusIndicator.style.marginRight = 10;
             
-            bool needsFix = needsAttention();
+            bool needsFix = false;
+            try {
+                needsFix = needsAttention();
+            } catch (System.Exception) {
+                // If we can't determine the status, assume it needs attention
+                needsFix = true;
+            }
+            
             if (needsFix) {
                 statusIndicator.style.backgroundColor = new Color(1f, 0.6f, 0f); // Orange for needs attention
             } else {
@@ -269,8 +283,12 @@ namespace NDream.AirConsole.Editor {
             // Apply button
             if (needsFix) {
                 var applyButton = new Button(() => {
-                    applyFix();
-                    RefreshRecommendations();
+                    try {
+                        applyFix();
+                        RefreshRecommendations();
+                    } catch (System.Exception ex) {
+                        Debug.LogError($"Failed to apply recommendation '{title}': {ex.Message}");
+                    }
                 }) {
                     text = "Apply",
                     style = { 
@@ -345,85 +363,124 @@ namespace NDream.AirConsole.Editor {
         }
 
         private void ApplyAllRecommendations() {
-            // Apply all WebGL recommendations
-            if (PlayerSettings.WebGL.dataCaching) {
-                PlayerSettings.WebGL.dataCaching = false;
-            }
+            int applied = 0;
+            int errors = 0;
             
-            if (PlayerSettings.WebGL.memoryGrowthMode != WebGLMemoryGrowthMode.None) {
-                PlayerSettings.WebGL.memoryGrowthMode = WebGLMemoryGrowthMode.None;
-                PlayerSettings.WebGL.initialMemorySize = Mathf.Min(512,
-                    Mathf.Max(PlayerSettings.WebGL.initialMemorySize, PlayerSettings.WebGL.maximumMemorySize));
-            }
-            
-            if (PlayerSettings.WebGL.memorySize > 512) {
-                PlayerSettings.WebGL.initialMemorySize = 512;
+            try {
+                // Apply all WebGL recommendations
+                if (PlayerSettings.WebGL.dataCaching) {
+                    PlayerSettings.WebGL.dataCaching = false;
+                    applied++;
+                }
+                
+                if (PlayerSettings.WebGL.memoryGrowthMode != WebGLMemoryGrowthMode.None) {
+                    PlayerSettings.WebGL.memoryGrowthMode = WebGLMemoryGrowthMode.None;
+                    PlayerSettings.WebGL.initialMemorySize = Mathf.Min(512,
+                        Mathf.Max(PlayerSettings.WebGL.initialMemorySize, PlayerSettings.WebGL.maximumMemorySize));
+                    applied++;
+                }
+                
+                if (PlayerSettings.WebGL.memorySize > 512) {
+                    PlayerSettings.WebGL.initialMemorySize = 512;
+                    applied++;
+                }
+
+                if (PlayerSettings.WebGL.nameFilesAsHashes) {
+                    PlayerSettings.WebGL.nameFilesAsHashes = false;
+                    applied++;
+                }
+
+                if (PlayerSettings.GetScriptingBackend(BuildTargetGroup.WebGL) != ScriptingImplementation.IL2CPP) {
+                    PlayerSettings.SetScriptingBackend(BuildTargetGroup.WebGL, ScriptingImplementation.IL2CPP);
+                    applied++;
+                }
+            } catch (System.Exception ex) {
+                Debug.LogError($"Error applying WebGL recommendations: {ex.Message}");
+                errors++;
             }
 
-            if (PlayerSettings.WebGL.nameFilesAsHashes) {
-                PlayerSettings.WebGL.nameFilesAsHashes = false;
+            try {
+                // Apply all Android recommendations
+                if (!PlayerSettings.GetMobileMTRendering(BuildTargetGroup.Android)) {
+                    PlayerSettings.SetMobileMTRendering(BuildTargetGroup.Android, true);
+                    applied++;
+                }
+                
+                if (PlayerSettings.Android.preferredInstallLocation != AndroidPreferredInstallLocation.Auto) {
+                    PlayerSettings.Android.preferredInstallLocation = AndroidPreferredInstallLocation.Auto;
+                    applied++;
+                }
+                
+                if (PlayerSettings.vulkanNumSwapchainBuffers < 3) {
+                    PlayerSettings.vulkanNumSwapchainBuffers = 3;
+                    applied++;
+                }
+                
+                if (!PlayerSettings.Android.optimizedFramePacing) {
+                    PlayerSettings.Android.optimizedFramePacing = true;
+                    applied++;
+                }
+
+                if (PlayerSettings.Android.targetArchitectures != (AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7)) {
+                    PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
+                    applied++;
+                }
+
+                if (PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) != ScriptingImplementation.IL2CPP) {
+                    PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
+                    applied++;
+                }
+
+                if ((int)PlayerSettings.Android.targetSdkVersion < 34) {
+                    PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)34;
+                    applied++;
+                }
+            } catch (System.Exception ex) {
+                Debug.LogError($"Error applying Android recommendations: {ex.Message}");
+                errors++;
             }
 
-            if (PlayerSettings.GetScriptingBackend(BuildTargetGroup.WebGL) != ScriptingImplementation.IL2CPP) {
-                PlayerSettings.SetScriptingBackend(BuildTargetGroup.WebGL, ScriptingImplementation.IL2CPP);
-            }
+            try {
+                // Apply all General recommendations
+                bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
+                if (PlayerSettings.runInBackground != shouldRunInBackground) {
+                    PlayerSettings.runInBackground = shouldRunInBackground;
+                    applied++;
+                }
+                
+                if (PlayerSettings.muteOtherAudioSources) {
+                    PlayerSettings.muteOtherAudioSources = false;
+                    applied++;
+                }
 
-            // Apply all Android recommendations
-            if (!PlayerSettings.GetMobileMTRendering(BuildTargetGroup.Android)) {
-                PlayerSettings.SetMobileMTRendering(BuildTargetGroup.Android, true);
-            }
-            
-            if (PlayerSettings.Android.preferredInstallLocation != AndroidPreferredInstallLocation.Auto) {
-                PlayerSettings.Android.preferredInstallLocation = AndroidPreferredInstallLocation.Auto;
-            }
-            
-            if (PlayerSettings.vulkanNumSwapchainBuffers < 3) {
-                PlayerSettings.vulkanNumSwapchainBuffers = 3;
-            }
-            
-            if (!PlayerSettings.Android.optimizedFramePacing) {
-                PlayerSettings.Android.optimizedFramePacing = true;
-            }
+                if (PlayerSettings.allowUnsafeCode) {
+                    PlayerSettings.allowUnsafeCode = false;
+                    applied++;
+                }
 
-            if (PlayerSettings.Android.targetArchitectures != (AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7)) {
-                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
-            }
+                if (!PlayerSettings.resetResolutionOnWindowResize) {
+                    PlayerSettings.resetResolutionOnWindowResize = true;
+                    applied++;
+                }
 
-            if (PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) != ScriptingImplementation.IL2CPP) {
-                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
-            }
-
-            if ((int)PlayerSettings.Android.targetSdkVersion < 34) {
-                PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)34;
-            }
-
-            // Apply all General recommendations
-            bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
-            if (PlayerSettings.runInBackground != shouldRunInBackground) {
-                PlayerSettings.runInBackground = shouldRunInBackground;
-            }
-            
-            if (PlayerSettings.muteOtherAudioSources) {
-                PlayerSettings.muteOtherAudioSources = false;
-            }
-
-            if (PlayerSettings.allowUnsafeCode) {
-                PlayerSettings.allowUnsafeCode = false;
-            }
-
-            if (!PlayerSettings.resetResolutionOnWindowResize) {
-                PlayerSettings.resetResolutionOnWindowResize = true;
-            }
-
-            if (PlayerSettings.SplashScreen.showUnityLogo) {
-                PlayerSettings.SplashScreen.showUnityLogo = false;
+                if (PlayerSettings.SplashScreen.showUnityLogo) {
+                    PlayerSettings.SplashScreen.showUnityLogo = false;
+                    applied++;
+                }
+            } catch (System.Exception ex) {
+                Debug.LogError($"Error applying General recommendations: {ex.Message}");
+                errors++;
             }
 
             // Refresh the view to show updated status
             RefreshRecommendations();
             
             // Show a notification
-            Debug.Log("AirConsole Project Optimizer: All recommendations have been applied!");
+            if (errors == 0) {
+                Debug.Log($"AirConsole Project Optimizer: {applied} recommendations have been applied successfully!");
+            } else {
+                Debug.LogWarning($"AirConsole Project Optimizer: {applied} recommendations applied, {errors} errors occurred. Check console for details.");
+            }
         }
     }
 }
