@@ -48,6 +48,18 @@ namespace NDream.AirConsole.Editor.Tests {
                 window.Close();
             }
         }
+
+        [Test]
+        public void ProjectOptimizer_UsesUXMLAndUSS() {
+            // Test that the UXML and USS files can be loaded
+            var uxml = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.VisualTreeAsset>(
+                "Assets/AirConsole/scripts/Editor/ProjectOptimizer.uxml");
+            var uss = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.StyleSheet>(
+                "Assets/AirConsole/scripts/Editor/ProjectOptimizer.uss");
+            
+            Assert.IsNotNull(uxml, "UXML file should be loadable");
+            Assert.IsNotNull(uss, "USS file should be loadable");
+        }
     }
 }
 #endif
