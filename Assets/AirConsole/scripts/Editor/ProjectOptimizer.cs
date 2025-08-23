@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.Rendering;
+using System.Collections.Generic;
 
 namespace NDream.AirConsole.Editor {
     /// <summary>
@@ -13,7 +14,8 @@ namespace NDream.AirConsole.Editor {
     /// but presents them in a user-friendly interface with individual apply buttons.
     /// </summary>
     public class ProjectOptimizer : EditorWindow {
-        private ScrollView mainScrollView;
+        private VisualTreeAsset uiDocument;
+        private StyleSheet styleSheet;
         
         [MenuItem("Window/AirConsole/Project Optimizer")]
         public static void ShowWindow() {
@@ -23,343 +25,189 @@ namespace NDream.AirConsole.Editor {
         }
 
         public void CreateGUI() {
+            // Load UXML and USS files
+            uiDocument = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/AirConsole/scripts/Editor/ProjectOptimizer.uxml");
+            styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/AirConsole/scripts/Editor/ProjectOptimizer.uss");
+            
+            if (uiDocument == null) {
+                Debug.LogError("Could not load ProjectOptimizer.uxml file");
+                return;
+            }
+            
+            // Clone the UXML tree
             VisualElement root = rootVisualElement;
+            uiDocument.CloneTree(root);
             
-            // Create main scroll view
-            mainScrollView = new ScrollView();
-            root.Add(mainScrollView);
+            // Apply the stylesheet
+            if (styleSheet != null) {
+                root.styleSheets.Add(styleSheet);
+            }
             
-            // Add header
-            mainScrollView.Add(CreateHeader("AirConsole Project Optimizer", false));
-            mainScrollView.Add(CreateDescription("Optimize your project for AirConsole web and Android platforms"));
+            // Setup event handlers
+            SetupEventHandlers();
             
-            // Add Apply All button at the top
-            var applyAllButton = new Button(ApplyAllRecommendations) {
-                text = "Apply All Recommendations",
-                style = { 
-                    marginBottom = 20,
-                    backgroundColor = new Color(0.2f, 0.6f, 0.2f),
-                    color = Color.white,
-                    height = 30
-                }
-            };
-            mainScrollView.Add(applyAllButton);
-            
-            // Add platform sections
-            CreateWebGLSection();
-            CreateAndroidSection();
-            CreateGeneralSection();
-            
-            // Refresh button
-            var refreshButton = new Button(RefreshRecommendations) {
-                text = "Refresh Recommendations",
-                style = { marginTop = 20 }
-            };
-            mainScrollView.Add(refreshButton);
+            // Update the UI with current settings
+            RefreshRecommendations();
         }
 
-        private void CreateWebGLSection() {
-            mainScrollView.Add(CreateHeader("WebGL Recommendations"));
+        private void SetupEventHandlers() {
+            VisualElement root = rootVisualElement;
             
-            // Data Caching
-            CreateRecommendationItem(
-                "Data Caching",
-                "Should be disabled to avoid interference with automotive requirements",
-                () => PlayerSettings.WebGL.dataCaching,
-                () => PlayerSettings.WebGL.dataCaching = false,
-                false
-            );
+            // Apply All button
+            var applyAllButton = root.Q<Button>("apply-all-button");
+            if (applyAllButton != null) {
+                applyAllButton.clicked += ApplyAllRecommendations;
+            }
             
-            // Memory Growth Mode
-            CreateRecommendationItem(
-                "Memory Growth Mode",
-                "Should be set to None for performance and stability on automotive",
-                () => PlayerSettings.WebGL.memoryGrowthMode != WebGLMemoryGrowthMode.None,
+            // Refresh button
+            var refreshButton = root.Q<Button>("refresh-button");
+            if (refreshButton != null) {
+                refreshButton.clicked += RefreshRecommendations;
+            }
+            
+            // Setup individual apply buttons for each recommendation
+            SetupRecommendationButton("data-caching", () => PlayerSettings.WebGL.dataCaching, 
+                () => PlayerSettings.WebGL.dataCaching = false);
+            
+            SetupRecommendationButton("memory-growth-mode", () => PlayerSettings.WebGL.memoryGrowthMode != WebGLMemoryGrowthMode.None,
                 () => {
                     PlayerSettings.WebGL.memoryGrowthMode = WebGLMemoryGrowthMode.None;
                     PlayerSettings.WebGL.initialMemorySize = Mathf.Min(512,
                         Mathf.Max(PlayerSettings.WebGL.initialMemorySize, PlayerSettings.WebGL.maximumMemorySize));
-                },
-                false
-            );
+                });
             
-            // Initial Memory Size
-            CreateRecommendationItem(
-                "Initial Memory Size",
-                "Should stay at or below 512MB for automotive compatibility",
-                () => PlayerSettings.WebGL.memorySize > 512,
-                () => PlayerSettings.WebGL.initialMemorySize = 512,
-                false
-            );
-
-            // Name Files As Hashes
-            CreateRecommendationItem(
-                "Name Files As Hashes",
-                "Should be disabled as we upload into timestamp based folders",
-                () => PlayerSettings.WebGL.nameFilesAsHashes,
-                () => PlayerSettings.WebGL.nameFilesAsHashes = false,
-                false
-            );
-
-            // Scripting Backend
-            CreateRecommendationItem(
-                "Scripting Backend",
-                "Should be set to IL2CPP for WebGL",
-                () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.WebGL) != ScriptingImplementation.IL2CPP,
-                () => PlayerSettings.SetScriptingBackend(BuildTargetGroup.WebGL, ScriptingImplementation.IL2CPP),
-                false
-            );
+            SetupRecommendationButton("initial-memory-size", () => PlayerSettings.WebGL.memorySize > 512,
+                () => PlayerSettings.WebGL.initialMemorySize = 512);
+            
+            SetupRecommendationButton("name-files-as-hashes", () => PlayerSettings.WebGL.nameFilesAsHashes,
+                () => PlayerSettings.WebGL.nameFilesAsHashes = false);
+            
+            SetupRecommendationButton("webgl-scripting-backend", () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.WebGL) != ScriptingImplementation.IL2CPP,
+                () => PlayerSettings.SetScriptingBackend(BuildTargetGroup.WebGL, ScriptingImplementation.IL2CPP));
+            
+            SetupRecommendationButton("multithreaded-rendering", () => !PlayerSettings.GetMobileMTRendering(BuildTargetGroup.Android),
+                () => PlayerSettings.SetMobileMTRendering(BuildTargetGroup.Android, true));
+            
+            SetupRecommendationButton("preferred-install-location", () => PlayerSettings.Android.preferredInstallLocation != AndroidPreferredInstallLocation.Auto,
+                () => PlayerSettings.Android.preferredInstallLocation = AndroidPreferredInstallLocation.Auto);
+            
+            SetupRecommendationButton("vulkan-swapchain-buffers", () => PlayerSettings.vulkanNumSwapchainBuffers < 3,
+                () => PlayerSettings.vulkanNumSwapchainBuffers = 3);
+            
+            SetupRecommendationButton("optimized-frame-pacing", () => !PlayerSettings.Android.optimizedFramePacing,
+                () => PlayerSettings.Android.optimizedFramePacing = true);
+            
+            SetupRecommendationButton("target-architecture", () => PlayerSettings.Android.targetArchitectures != (AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7),
+                () => PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7);
+            
+            SetupRecommendationButton("android-scripting-backend", () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) != ScriptingImplementation.IL2CPP,
+                () => PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP));
+            
+            SetupRecommendationButton("target-sdk-version", () => (int)PlayerSettings.Android.targetSdkVersion < 34,
+                () => PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)34);
+            
+            SetupRecommendationButton("run-in-background", () => {
+                bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
+                return PlayerSettings.runInBackground != shouldRunInBackground;
+            }, () => {
+                bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
+                PlayerSettings.runInBackground = shouldRunInBackground;
+            });
+            
+            SetupRecommendationButton("mute-other-audio-sources", () => PlayerSettings.muteOtherAudioSources,
+                () => PlayerSettings.muteOtherAudioSources = false);
+            
+            SetupRecommendationButton("allow-unsafe-code", () => PlayerSettings.allowUnsafeCode,
+                () => PlayerSettings.allowUnsafeCode = false);
+            
+            SetupRecommendationButton("reset-resolution-on-window-resize", () => !PlayerSettings.resetResolutionOnWindowResize,
+                () => PlayerSettings.resetResolutionOnWindowResize = true);
+            
+            SetupRecommendationButton("unity-logo-splash-screen", () => PlayerSettings.SplashScreen.showUnityLogo,
+                () => PlayerSettings.SplashScreen.showUnityLogo = false);
         }
 
-        private void CreateAndroidSection() {
-            mainScrollView.Add(CreateHeader("Android Recommendations"));
+        private void SetupRecommendationButton(string elementName, System.Func<bool> needsAttention, System.Action applyFix) {
+            VisualElement root = rootVisualElement;
+            var container = root.Q<VisualElement>(elementName);
+            if (container == null) return;
             
-            // Multithreaded Rendering
-            CreateRecommendationItem(
-                "Multithreaded Rendering",
-                "Ensures optimal performance and thermal load",
-                () => !PlayerSettings.GetMobileMTRendering(BuildTargetGroup.Android),
-                () => PlayerSettings.SetMobileMTRendering(BuildTargetGroup.Android, true),
-                true
-            );
-            
-            // Preferred Install Location
-            CreateRecommendationItem(
-                "Preferred Install Location",
-                "Should be set to Auto for best compatibility",
-                () => PlayerSettings.Android.preferredInstallLocation != AndroidPreferredInstallLocation.Auto,
-                () => PlayerSettings.Android.preferredInstallLocation = AndroidPreferredInstallLocation.Auto,
-                false
-            );
-            
-            // Vulkan Swapchain Buffers
-            CreateRecommendationItem(
-                "Vulkan Swapchain Buffers",
-                "Must contain at least 3 buffers for proper rendering",
-                () => PlayerSettings.vulkanNumSwapchainBuffers < 3,
-                () => PlayerSettings.vulkanNumSwapchainBuffers = 3,
-                false
-            );
-            
-            // Optimized Frame Pacing
-            CreateRecommendationItem(
-                "Optimized Frame Pacing",
-                "Improves frame consistency and performance on Android",
-                () => !PlayerSettings.Android.optimizedFramePacing,
-                () => PlayerSettings.Android.optimizedFramePacing = true,
-                false
-            );
-
-            // Target Architecture
-            CreateRecommendationItem(
-                "Target Architecture",
-                "Should include both ARM64 and ARMv7 for compatibility",
-                () => PlayerSettings.Android.targetArchitectures != (AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7),
-                () => PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7,
-                false
-            );
-
-            // Scripting Backend
-            CreateRecommendationItem(
-                "Scripting Backend",
-                "Should be set to IL2CPP for Android",
-                () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) != ScriptingImplementation.IL2CPP,
-                () => PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP),
-                false
-            );
-
-            // Target SDK Version
-            CreateRecommendationItem(
-                "Target SDK Version",
-                "Should be at least 34 for Google Play compatibility",
-                () => (int)PlayerSettings.Android.targetSdkVersion < 34,
-                () => PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)34,
-                false
-            );
+            var button = container.Q<Button>(className: "apply-button");
+            if (button != null) {
+                button.clicked += () => {
+                    try {
+                        applyFix();
+                        UpdateRecommendationStatus(elementName, needsAttention);
+                    } catch (System.Exception ex) {
+                        Debug.LogError($"Failed to apply recommendation '{elementName}': {ex.Message}");
+                    }
+                };
+            }
         }
 
-        private void CreateGeneralSection() {
-            mainScrollView.Add(CreateHeader("General Recommendations"));
+        private void UpdateRecommendationStatus(string elementName, System.Func<bool> needsAttention) {
+            VisualElement root = rootVisualElement;
+            var container = root.Q<VisualElement>(elementName);
+            if (container == null) return;
             
-            // Run In Background
-            bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
-            CreateRecommendationItem(
-                "Run In Background",
-                $"Should be {shouldRunInBackground} for {EditorUserBuildSettings.activeBuildTarget}",
-                () => PlayerSettings.runInBackground != shouldRunInBackground,
-                () => PlayerSettings.runInBackground = shouldRunInBackground,
-                false
-            );
-            
-            // Mute Other Audio Sources
-            CreateRecommendationItem(
-                "Mute Other Audio Sources",
-                "Should be disabled for automotive compatibility",
-                () => PlayerSettings.muteOtherAudioSources,
-                () => PlayerSettings.muteOtherAudioSources = false,
-                false
-            );
-
-            // Unsafe Code
-            CreateRecommendationItem(
-                "Allow Unsafe Code",
-                "Should be disabled to ensure automotive platform compatibility",
-                () => PlayerSettings.allowUnsafeCode,
-                () => PlayerSettings.allowUnsafeCode = false,
-                false
-            );
-
-            // Reset Resolution On Window Resize
-            CreateRecommendationItem(
-                "Reset Resolution On Window Resize",
-                "Should be enabled for proper window handling",
-                () => !PlayerSettings.resetResolutionOnWindowResize,
-                () => PlayerSettings.resetResolutionOnWindowResize = true,
-                false
-            );
-
-            // Unity Logo in Splash Screen
-            CreateRecommendationItem(
-                "Unity Logo in Splash Screen",
-                "Should be disabled for cleaner presentation",
-                () => PlayerSettings.SplashScreen.showUnityLogo,
-                () => PlayerSettings.SplashScreen.showUnityLogo = false,
-                false
-            );
-        }
-
-        private void CreateRecommendationItem(string title, string description, System.Func<bool> needsAttention, System.Action applyFix, bool isOptimal) {
-            var container = new VisualElement();
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
-            container.style.marginBottom = 10;
-            container.style.paddingLeft = 10;
-            container.style.paddingRight = 10;
-            container.style.paddingTop = 8;
-            container.style.paddingBottom = 8;
-            container.style.borderBottomWidth = 1;
-            container.style.borderBottomColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
-            
-            // Status indicator
-            var statusIndicator = new VisualElement();
-            statusIndicator.style.width = 16;
-            statusIndicator.style.height = 16;
-            statusIndicator.style.borderRadius = 8;
-            statusIndicator.style.marginRight = 10;
+            var statusIndicator = container.Q<VisualElement>(className: "status-indicator");
+            var applyButton = container.Q<Button>(className: "apply-button");
+            var statusCheckmark = container.Q<Label>(className: "status-checkmark");
             
             bool needsFix = false;
             try {
                 needsFix = needsAttention();
             } catch (System.Exception) {
-                // If we can't determine the status, assume it needs attention
                 needsFix = true;
             }
             
             if (needsFix) {
-                statusIndicator.style.backgroundColor = new Color(1f, 0.6f, 0f); // Orange for needs attention
+                statusIndicator?.RemoveFromClassList("compliant");
+                applyButton?.RemoveFromClassList("hidden");
+                statusCheckmark?.AddToClassList("hidden");
             } else {
-                statusIndicator.style.backgroundColor = new Color(0.2f, 0.8f, 0.2f); // Green for good
+                statusIndicator?.AddToClassList("compliant");
+                applyButton?.AddToClassList("hidden");
+                statusCheckmark?.RemoveFromClassList("hidden");
             }
-            
-            container.Add(statusIndicator);
-            
-            // Content container
-            var contentContainer = new VisualElement();
-            contentContainer.style.flexGrow = 1;
-            
-            var titleLabel = new Label(title);
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.fontSize = 14;
-            contentContainer.Add(titleLabel);
-            
-            var descLabel = new Label(description);
-            descLabel.style.fontSize = 12;
-            descLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
-            descLabel.style.whiteSpace = WhiteSpace.Normal;
-            contentContainer.Add(descLabel);
-            
-            container.Add(contentContainer);
-            
-            // Apply button
-            if (needsFix) {
-                var applyButton = new Button(() => {
-                    try {
-                        applyFix();
-                        RefreshRecommendations();
-                    } catch (System.Exception ex) {
-                        Debug.LogError($"Failed to apply recommendation '{title}': {ex.Message}");
-                    }
-                }) {
-                    text = "Apply",
-                    style = { 
-                        marginLeft = 10,
-                        minWidth = 60
-                    }
-                };
-                container.Add(applyButton);
-            } else {
-                var statusLabel = new Label("✓");
-                statusLabel.style.color = new Color(0.2f, 0.8f, 0.2f);
-                statusLabel.style.fontSize = 16;
-                statusLabel.style.marginLeft = 10;
-                statusLabel.style.minWidth = 60;
-                statusLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                container.Add(statusLabel);
-            }
-            
-            mainScrollView.Add(container);
-        }
-
-        private Label CreateHeader(string text, bool hasTopMargin = true) {
-            Label label = new Label(text);
-            if (hasTopMargin) {
-                label.style.marginTop = 20;
-            }
-            label.style.marginBottom = 10;
-            label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            label.style.fontSize = 16;
-            return label;
-        }
-
-        private Label CreateDescription(string text) {
-            Label label = new Label(text);
-            label.style.fontSize = 12;
-            label.style.color = new Color(0.7f, 0.7f, 0.7f);
-            label.style.marginBottom = 20;
-            label.style.whiteSpace = WhiteSpace.Normal;
-            return label;
         }
 
         private void RefreshRecommendations() {
-            // Clear existing content
-            mainScrollView.Clear();
+            VisualElement root = rootVisualElement;
             
-            // Recreate content
-            mainScrollView.Add(CreateHeader("AirConsole Project Optimizer", false));
-            mainScrollView.Add(CreateDescription("Optimize your project for AirConsole web and Android platforms"));
+            // Update all recommendation statuses
+            UpdateRecommendationStatus("data-caching", () => PlayerSettings.WebGL.dataCaching);
+            UpdateRecommendationStatus("memory-growth-mode", () => PlayerSettings.WebGL.memoryGrowthMode != WebGLMemoryGrowthMode.None);
+            UpdateRecommendationStatus("initial-memory-size", () => PlayerSettings.WebGL.memorySize > 512);
+            UpdateRecommendationStatus("name-files-as-hashes", () => PlayerSettings.WebGL.nameFilesAsHashes);
+            UpdateRecommendationStatus("webgl-scripting-backend", () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.WebGL) != ScriptingImplementation.IL2CPP);
             
-            // Add Apply All button at the top
-            var applyAllButton = new Button(ApplyAllRecommendations) {
-                text = "Apply All Recommendations",
-                style = { 
-                    marginBottom = 20,
-                    backgroundColor = new Color(0.2f, 0.6f, 0.2f),
-                    color = Color.white,
-                    height = 30
+            UpdateRecommendationStatus("multithreaded-rendering", () => !PlayerSettings.GetMobileMTRendering(BuildTargetGroup.Android));
+            UpdateRecommendationStatus("preferred-install-location", () => PlayerSettings.Android.preferredInstallLocation != AndroidPreferredInstallLocation.Auto);
+            UpdateRecommendationStatus("vulkan-swapchain-buffers", () => PlayerSettings.vulkanNumSwapchainBuffers < 3);
+            UpdateRecommendationStatus("optimized-frame-pacing", () => !PlayerSettings.Android.optimizedFramePacing);
+            UpdateRecommendationStatus("target-architecture", () => PlayerSettings.Android.targetArchitectures != (AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7));
+            UpdateRecommendationStatus("android-scripting-backend", () => PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) != ScriptingImplementation.IL2CPP);
+            UpdateRecommendationStatus("target-sdk-version", () => (int)PlayerSettings.Android.targetSdkVersion < 34);
+            
+            UpdateRecommendationStatus("run-in-background", () => {
+                bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
+                return PlayerSettings.runInBackground != shouldRunInBackground;
+            });
+            UpdateRecommendationStatus("mute-other-audio-sources", () => PlayerSettings.muteOtherAudioSources);
+            UpdateRecommendationStatus("allow-unsafe-code", () => PlayerSettings.allowUnsafeCode);
+            UpdateRecommendationStatus("reset-resolution-on-window-resize", () => !PlayerSettings.resetResolutionOnWindowResize);
+            UpdateRecommendationStatus("unity-logo-splash-screen", () => PlayerSettings.SplashScreen.showUnityLogo);
+            
+            // Update the run-in-background description text based on current build target
+            var runInBackgroundContainer = root.Q<VisualElement>("run-in-background");
+            if (runInBackgroundContainer != null) {
+                var descLabel = runInBackgroundContainer.Q<Label>(className: "recommendation-description");
+                if (descLabel != null) {
+                    bool shouldRunInBackground = EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL;
+                    descLabel.text = $"Should be {shouldRunInBackground} for {EditorUserBuildSettings.activeBuildTarget}";
                 }
-            };
-            mainScrollView.Add(applyAllButton);
-            
-            CreateWebGLSection();
-            CreateAndroidSection();
-            CreateGeneralSection();
-            
-            // Refresh button
-            var refreshButton = new Button(RefreshRecommendations) {
-                text = "Refresh Recommendations",
-                style = { marginTop = 20 }
-            };
-            mainScrollView.Add(refreshButton);
+            }
         }
 
         private void ApplyAllRecommendations() {
