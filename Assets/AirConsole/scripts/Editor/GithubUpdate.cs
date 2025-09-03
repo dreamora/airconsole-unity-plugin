@@ -7,7 +7,7 @@ namespace NDream.AirConsole.Editor {
     using UnityEngine;
     using UnityEngine.Networking;
 
-    internal abstract class GithubUpdate {
+    internal static class GithubUpdate {
         private const string GithubLatestAPI = "https://api.github.com/repos/airconsole/airconsole-unity-plugin/releases/latest";
 
         private static bool _updateCheckStarted;
@@ -23,8 +23,10 @@ namespace NDream.AirConsole.Editor {
         internal static Version LatestVersion => _latestVersion;
 
         internal static void BeginBackgroundUpdateCheck() {
-            if (_updateCheckStarted || _updateCheckInProgress)
+            if (_updateCheckStarted || _updateCheckInProgress) {
                 return;
+            }
+
             _updateCheckStarted = true;
             _updateCheckInProgress = true;
             try {
@@ -39,27 +41,23 @@ namespace NDream.AirConsole.Editor {
         }
 
         private static void PollUpdateCheck() {
-            if (_checkOp == null)
+            if (_checkOp == null) {
                 return;
-#if UNITY_2020_2_OR_NEWER
+            }
+
             bool done = _checkOp.isDone && _checkRequest.result != UnityWebRequest.Result.InProgress;
-            bool success = _checkRequest.result == UnityWebRequest.Result.Success;
-#else
-            bool done = s_CheckOp.isDone;
-            bool success = !s_CheckRequest.isNetworkError && !s_CheckRequest.isHttpError;
-#endif
-            if (!done) return;
+            if (!done) {
+                return;
+            }
 
             try {
-                if (success) {
-                    var json = _checkRequest.downloadHandler.text;
-                    var release = JsonUtility.FromJson<GithubRelease>(json);
+                if (_checkRequest.result == UnityWebRequest.Result.Success) {
+                    string json = _checkRequest.downloadHandler.text;
+                    GithubRelease release = JsonUtility.FromJson<GithubRelease>(json);
                     _cachedLatestRelease = release;
-                    var latestTag = (release?.tag_name ?? release?.name ?? "").Trim();
-                    var latestVersionStr = latestTag.StartsWith("v", StringComparison.OrdinalIgnoreCase)
-                        ? latestTag.Substring(1)
-                        : latestTag;
-                    if (Version.TryParse(Settings.VERSION, out var current) && Version.TryParse(latestVersionStr, out var latest)) {
+
+                    if (TryParseVersionFromTag(release?.tag_name ?? release?.name, out var latest) &&
+                        Version.TryParse(Settings.VERSION, out var current)) {
                         _latestVersion = latest;
                         _updateAvailable = latest > current;
                     } else {
@@ -82,6 +80,18 @@ namespace NDream.AirConsole.Editor {
             }
         }
 
+        private static bool TryParseVersionFromTag(string tag, out Version version) {
+            version = null;
+            if (string.IsNullOrEmpty(tag)) {
+                return false;
+            }
+            var versionStr = tag.Trim();
+            if (versionStr.StartsWith("v", StringComparison.OrdinalIgnoreCase)) {
+                versionStr = versionStr.Substring(1);
+            }
+            return Version.TryParse(versionStr, out version);
+        }
+
         [Serializable]
         private class GithubAsset {
             public string name;
@@ -99,150 +109,135 @@ namespace NDream.AirConsole.Editor {
         internal static void TryUpdatePluginFromGithub() {
             try {
                 EditorUtility.DisplayProgressBar("AirConsole", "Checking latest release…", 0.1f);
-                GithubRelease release = _cachedLatestRelease;
+                GithubRelease release = GetLatestRelease();
                 if (release == null) {
-                    string json = DownloadString(GithubLatestAPI, out long _);
-                    if (string.IsNullOrEmpty(json)) {
-                        EditorUtility.ClearProgressBar();
-                        EditorUtility.DisplayDialog("AirConsole", "Failed to retrieve release info.", "OK");
-                        return;
-                    }
-
-                    release = JsonUtility.FromJson<GithubRelease>(json);
-                }
-
-                if (release == null) {
-                    EditorUtility.ClearProgressBar();
-                    EditorUtility.DisplayDialog("AirConsole", "Could not parse release info.", "OK");
+                    EditorUtility.DisplayDialog("AirConsole", "Failed to retrieve release info.", "OK");
                     return;
                 }
 
-                string latestTag = (release.tag_name ?? release.name ?? "").Trim();
-                string latestVersionStr = latestTag.StartsWith("v", StringComparison.OrdinalIgnoreCase)
-                    ? latestTag.Substring(1)
-                    : latestTag;
-
-                Version current, latest;
-                bool currentOk = Version.TryParse(Settings.VERSION, out current);
-                bool latestOk = Version.TryParse(latestVersionStr, out latest);
-
-                if (currentOk && latestOk && latest <= current) {
-                    EditorUtility.ClearProgressBar();
-                    EditorUtility.DisplayDialog("AirConsole", $"Plugin is up to date (v{Settings.VERSION}).", "OK");
+                if (!ConfirmUpdate(release)) {
                     return;
                 }
 
-                string msg = latestOk
-                    ? $"Update available: v{Settings.VERSION} → v{latest}"
-                    : $"A newer release may be available: '{latestTag}'.\nCurrent: v{Settings.VERSION}";
-                bool doUpdate = EditorUtility.DisplayDialog("AirConsole", msg + "\n\nDownload and import the latest release?", "Update",
-                    "Cancel");
-                if (!doUpdate) {
-                    EditorUtility.ClearProgressBar();
+                GithubAsset package = FindDownloadableAsset(release);
+                if (package == null) {
+                    HandleNoDownloadableAsset(release);
                     return;
                 }
 
-                GithubAsset pkg = null;
-                if (release.assets != null && release.assets.Length > 0) {
-                    pkg = release.assets.FirstOrDefault(a =>
-                              a != null
-                              && !string.IsNullOrEmpty(a.name)
-                              && a.name.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase))
-                          ?? release.assets.FirstOrDefault(a =>
-                              a != null && !string.IsNullOrEmpty(a.name) && a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
-                }
+                DownloadAndImportPackage(package);
 
-                if (pkg == null || string.IsNullOrEmpty(pkg.browser_download_url)) {
-                    EditorUtility.ClearProgressBar();
-                    if (!string.IsNullOrEmpty(release.html_url)) {
-                        bool open = EditorUtility.DisplayDialog("AirConsole", "Could not find a .unitypackage asset in the latest release.",
-                            "Open Releases", "Close");
-                        if (open) Application.OpenURL(release.html_url);
-                    } else {
-                        EditorUtility.DisplayDialog("AirConsole", "Could not find downloadable assets for the latest release.", "OK");
-                    }
-
-                    return;
-                }
-
-                string tempPath = Path.Combine(Path.GetTempPath(),
-                    pkg.name ?? ("airconsole-plugin-" + Guid.NewGuid().ToString("N") + ".unitypackage"));
-                EditorUtility.DisplayProgressBar("AirConsole", "Downloading package…", 0.4f);
-                long contentLength;
-                byte[] data = DownloadBytes(pkg.browser_download_url, out contentLength);
-                if (data == null || data.Length == 0) {
-                    EditorUtility.ClearProgressBar();
-                    EditorUtility.DisplayDialog("AirConsole", "Failed to download the package.", "OK");
-                    return;
-                }
-
-                File.WriteAllBytes(tempPath, data);
-                EditorUtility.DisplayProgressBar("AirConsole", "Importing package…", 0.9f);
-
-                if (tempPath.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase)) {
-                    AssetDatabase.ImportPackage(tempPath, true);
-                } else {
-                    bool open = EditorUtility.DisplayDialog("AirConsole",
-                        "Downloaded asset is not a .unitypackage. Open in browser instead?", "Open", "Cancel");
-                    if (open) Application.OpenURL(pkg.browser_download_url);
-                }
-
-                EditorUtility.ClearProgressBar();
             } catch (Exception ex) {
-                EditorUtility.ClearProgressBar();
                 AirConsoleLogger.LogError(() => $"Update failed: {ex.Message}");
                 EditorUtility.DisplayDialog("AirConsole", "Update failed. See console for details.", "OK");
+            } finally {
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
+        private static GithubRelease GetLatestRelease() {
+            if (_cachedLatestRelease != null) {
+                return _cachedLatestRelease;
+            }
+
+            string json = DownloadString(GithubLatestAPI, out _);
+            if (string.IsNullOrEmpty(json)) {
+                return null;
+            }
+
+            return JsonUtility.FromJson<GithubRelease>(json);
+        }
+
+        private static bool ConfirmUpdate(GithubRelease release) {
+            string latestTag = (release.tag_name ?? release.name ?? "").Trim();
+
+            bool latestOk = TryParseVersionFromTag(latestTag, out var latest);
+            bool currentOk = Version.TryParse(Settings.VERSION, out var current);
+
+            if (currentOk && latestOk && latest <= current) {
+                EditorUtility.DisplayDialog("AirConsole", $"Plugin is up to date (v{Settings.VERSION}).", "OK");
+                return false;
+            }
+
+            string msg = latestOk
+                ? $"Update available: v{Settings.VERSION} → v{latest}"
+                : $"A newer release may be available: '{latestTag}'.\nCurrent: v{Settings.VERSION}";
+
+            return EditorUtility.DisplayDialog("AirConsole", msg + "\n\nDownload and import the latest release?", "Update", "Cancel");
+        }
+
+        private static GithubAsset FindDownloadableAsset(GithubRelease release) {
+            return release.assets?.FirstOrDefault(a => a?.name?.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase) == true)
+                   ?? release.assets?.FirstOrDefault(a => a?.name?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true);
+        }
+
+        private static void HandleNoDownloadableAsset(GithubRelease release) {
+            if (!string.IsNullOrEmpty(release.html_url)) {
+                bool open = EditorUtility.DisplayDialog("AirConsole", "Could not find a .unitypackage asset in the latest release.",
+                    "Open Releases", "Close");
+                if (open) {
+                    Application.OpenURL(release.html_url);
+                }
+            } else {
+                EditorUtility.DisplayDialog("AirConsole", "Could not find downloadable assets for the latest release.", "OK");
+            }
+        }
+
+        private static void DownloadAndImportPackage(GithubAsset package) {
+            string tempPath = Path.Combine(Path.GetTempPath(),
+                package.name ?? "airconsole-plugin-" + Guid.NewGuid().ToString("N") + ".unitypackage");
+
+            EditorUtility.DisplayProgressBar("AirConsole", "Downloading package…", 0.4f);
+            byte[] data = DownloadBytes(package.browser_download_url, out _);
+
+            if (data == null || data.Length == 0) {
+                EditorUtility.DisplayDialog("AirConsole", "Failed to download the package.", "OK");
+                return;
+            }
+
+            File.WriteAllBytes(tempPath, data);
+            EditorUtility.DisplayProgressBar("AirConsole", "Importing package…", 0.9f);
+
+            if (tempPath.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase)) {
+                AssetDatabase.ImportPackage(tempPath, true);
+            } else {
+                bool open = EditorUtility.DisplayDialog("AirConsole",
+                    "Downloaded asset is not a .unitypackage. Open in browser instead?", "Open", "Cancel");
+                if (open) {
+                    Application.OpenURL(package.browser_download_url);
+                }
+            }
+        }
+
+        private static T Download<T>(string url, string progressMessage, Func<DownloadHandler, T> getResult, out long contentLength) where T : class {
+            contentLength = -1;
+            using (var req = UnityWebRequest.Get(url)) {
+                req.SetRequestHeader("User-Agent", "AirConsole-Unity-Updater");
+                var op = req.SendWebRequest();
+                while (!op.isDone) {
+                    EditorUtility.DisplayProgressBar("AirConsole", progressMessage, req.downloadProgress);
+                }
+
+                if (req.result != UnityWebRequest.Result.Success) {
+                    AirConsoleLogger.LogError(() => $"HTTP error: {req.responseCode} {req.error}");
+                    return null;
+                }
+
+                if (req.GetResponseHeaders()?.ContainsKey("CONTENT-LENGTH") == true) {
+                    long.TryParse(req.GetResponseHeader("CONTENT-LENGTH"), out contentLength);
+                } else {
+                    contentLength = -1;
+                }
+                return getResult(req.downloadHandler);
             }
         }
 
         private static string DownloadString(string url, out long contentLength) {
-            contentLength = -1;
-            using (UnityWebRequest req = UnityWebRequest.Get(url)) {
-                req.SetRequestHeader("User-Agent", "AirConsole-Unity-Updater");
-                var op = req.SendWebRequest();
-                while (!op.isDone) {
-                    EditorUtility.DisplayProgressBar("AirConsole", "Contacting GitHub…", req.downloadProgress);
-                }
-#if UNITY_2020_2_OR_NEWER
-                if (req.result != UnityWebRequest.Result.Success)
-#else
-                if (req.isNetworkError || req.isHttpError)
-#endif
-                {
-                    AirConsoleLogger.LogError(() => $"HTTP error: {req.responseCode} {req.error}");
-                    return null;
-                }
-
-                contentLength = req.GetResponseHeaders() != null && req.GetResponseHeaders().ContainsKey("CONTENT-LENGTH")
-                    ? long.Parse(req.GetResponseHeader("CONTENT-LENGTH"))
-                    : -1;
-                return req.downloadHandler.text;
-            }
+            return Download(url, "Contacting GitHub…", handler => handler.text, out contentLength);
         }
 
         private static byte[] DownloadBytes(string url, out long contentLength) {
-            contentLength = -1;
-            using (UnityWebRequest req = UnityWebRequest.Get(url)) {
-                req.SetRequestHeader("User-Agent", "AirConsole-Unity-Updater");
-                var op = req.SendWebRequest();
-                while (!op.isDone) {
-                    EditorUtility.DisplayProgressBar("AirConsole", "Downloading…", req.downloadProgress);
-                }
-#if UNITY_2020_2_OR_NEWER
-                if (req.result != UnityWebRequest.Result.Success)
-#else
-                if (req.isNetworkError || req.isHttpError)
-#endif
-                {
-                    AirConsoleLogger.LogError(() => $"HTTP error: {req.responseCode} {req.error}");
-                    return null;
-                }
-
-                contentLength = req.GetResponseHeaders() != null && req.GetResponseHeaders().ContainsKey("CONTENT-LENGTH")
-                    ? long.Parse(req.GetResponseHeader("CONTENT-LENGTH"))
-                    : -1;
-                return req.downloadHandler.data;
-            }
+            return Download(url, "Downloading…", handler => handler.data, out contentLength);
         }
     }
 }
