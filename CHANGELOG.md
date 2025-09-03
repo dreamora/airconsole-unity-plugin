@@ -13,6 +13,11 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 ### Removed
 
 - **Android**: The android library no longer manages AudioFocus or overriding the usage from USAGE_GAME.
+### Added
+
+- **Editor**: Add the ability to update the AirConsole Unity Plugin with a click from the inspector directly.
+
+### Fixed
 
 ## [2.6.1] - 2025-09-02
 
