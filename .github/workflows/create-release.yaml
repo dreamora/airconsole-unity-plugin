@@ -1,24 +1,48 @@
 name: Create Release
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (skip release creation)'
+        required: false
+        default: false
+        type: boolean
     branches:
       - master
+      - create-release-pipeline
 
 jobs:
   build:
+    name: Build ${{ matrix.platform }} ${{ matrix.unityVersion }}${{ matrix.is_release && ' (Release)' || '' }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       max-parallel: 1
       matrix:
-        unityVersion:
-          - 2022.3.62f1
-          # - 6000.0.50f1
-        platform:
-          - WebGL
-          # - Android
+        include:
+          - unityVersion: 2022.3.62f1
+            platform: WebGL
+            is_release: true
+          - unityVersion: 2022.3.62f1
+            platform: Android
+            is_release: false
+          - unityVersion: 6000.0.50f1
+            platform: WebGL
+            is_release: false
+          - unityVersion: 6000.0.50f1
+            platform: Android
+            is_release: false
 
     steps:
+    - name: Show Configuration
+      run: |
+        echo "=== Build Configuration ==="
+        echo "Unity Version: ${{ matrix.unityVersion }}"
+        echo "Platform: ${{ matrix.platform }}"
+        echo "Is Release: ${{ matrix.is_release }}"
+        echo "Dry Run Mode: ${{ inputs.dry_run }}"
+        echo "=========================="
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -32,6 +56,22 @@ jobs:
         echo "Extracted version: $version"
         echo "version=$version" >> $GITHUB_ENV
 
+    - name: Set workflow run name
+      run: |
+        if [ -z "$version" ]; then
+          echo "No version found; skipping run name update."
+          exit 0
+        fi
+        name="Create Release v${version} ${inputs.dry_run:+(Dry Run)}"
+        echo "Updating workflow run name to:  curl$name"
+        curl -s -X PATCH \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "Content-Type: application/json" \
+          https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+          -d "{\"name\":\"$name\"}" \
+          || echo "Warning: failed to update workflow run name"
+
     - name: Validate Version
       run: |
         if [[ ! "${{ env.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -41,9 +81,10 @@ jobs:
 
     - name: Check GitHub Releases
       id: check_release
+      if: inputs.dry_run == false
       run: |
         # Fetch releases from GitHub API
-        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/airconsole/airconsole-unity-plugin/releases")
+        releases=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases")
 
         # Check if a release with the extracted version exists
         exists=$(echo "$releases" | jq -r --arg version "v${{ env.version }}" '.[] | select(.tag_name == $version) | .tag_name')
@@ -55,38 +96,68 @@ jobs:
           echo "No release with version v${{ env.version }} found."
         fi
 
-    # - uses: actions/cache@v3
-    #   with:
-    #     path: Library
-    #     key: Library-AUP-${{ matrix.platform }}
-    #     restore-keys: |
-    #       Library-AUP-
-    #       Library-
-    #
-    # - name: Test ${{ matrix.platform }} in ${{ matrix.unityVersion }}
-    #   uses: game-ci/unity-builder@v4
-    #   env:
-    #     UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-    #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-    #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-    #   with:
-    #     unityVersion: ${{ matrix.unityVersion }}
-    #     targetPlatform: ${{ matrix.platform }}
-    #     buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
-    #     allowDirtyBuild: true
+    - name: Dry Run - Skip Release Check
+      if: inputs.dry_run == true
+      run: |
+        echo "=== DRY RUN MODE ==="
+        echo "Skipping duplicate release check for version v${{ env.version }}"
+        echo "==================="
 
-    # - name: Validate Build
-    #   run: |
-    #     filepath="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}"
-    #     if [ "${{ matrix.platform }}" == "Android" ]; then
-    #       filepath+=".apk"
-    #     elif [ "${{ matrix.platform }}" == "WebGL" ]; then
-    #       filepath+=".zip"
-    #     fi
-    #     if [ ! -f "$filepath" ]; then
-    #       echo "Build validation failed for ${{ matrix.platform }}"
-    #       exit 1
-    #     fi
+    - uses: actions/cache@v3
+      with:
+        path: Library
+        key: Library-AUP-${{ matrix.platform }}-${{ matrix.unityVersion }}
+        restore-keys: |
+          Library-AUP-${{ matrix.platform }}-
+          Library-AUP-
+          Library-
+
+    - name: Test ${{ matrix.platform }} in ${{ matrix.unityVersion }}
+      uses: game-ci/unity-test-runner@v4
+      env:
+        UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        testMode: EditMode
+        checkName: ${{ matrix.platform }} Test Results
+
+    - name: Build ${{ matrix.platform }} in ${{ matrix.unityVersion }}
+      uses: game-ci/unity-builder@v4
+      env:
+        UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        targetPlatform: ${{ matrix.platform }}
+        buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
+        allowDirtyBuild: true
+
+    - name: Validate Build
+      run: |
+        if [ "${{ matrix.platform }}" == "Android" ]; then
+          filepath="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}.apk"
+          if [ ! -f "$filepath" ]; then
+            echo "Build validation failed for ${{ matrix.platform }}"
+            exit 1
+          fi
+        elif [ "${{ matrix.platform }}" == "WebGL" ]; then
+          webgl_dir="Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}"
+          if [ ! -d "$webgl_dir" ]; then
+            echo "WebGL build directory not found: $webgl_dir"
+            exit 1
+          fi
+          # Zip the WebGL build directory
+          cd "Builds/${{ matrix.platform }}"
+          zip -r "release-${{ matrix.unityVersion }}-v${{ env.version }}.zip" "release-${{ matrix.unityVersion }}-v${{ env.version }}/"
+          cd ../..
+          if [ ! -f "Builds/${{ matrix.platform }}/release-${{ matrix.unityVersion }}-v${{ env.version }}.zip" ]; then
+            echo "Failed to create WebGL zip file"
+            exit 1
+          fi
+        fi
 
     - name: Extract release notes
       id: extract-release-notes
@@ -98,49 +169,53 @@ jobs:
     - name: Log Release Notes
       run: echo "Release Notes are ${{ steps.extract-release-notes.outputs.release_notes }}"
 
-    # - name: Generate unitypackage release
-    #   uses: game-ci/unity-builder@v4
-    #   env:
-    #     UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-    #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-    #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-    #   if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.61f1'
-    #   with:
-    #     unityVersion: ${{ matrix.unityVersion }}
-    #     targetPlatform: ${{ matrix.platform }}
-    #     buildMethod: NDream.Unity.Builder.Build${{ matrix.platform }}
-    #     allowDirtyBuild: true
-    #
-    # - name: Generate Release unity package
-    #   run: |
-    #     unity -quit -batchmode -executeMethod NDream.Unity.Packager.Export -projectPath . # -outputPath Builds/release-${{ github.event.inputs.version }}.unitypackage
-    #
+    - name: Generate unitypackage release
+      uses: game-ci/unity-builder@v4
+      env:
+        UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      if: matrix.is_release == true
+      with:
+        unityVersion: ${{ matrix.unityVersion }}
+        targetPlatform: ${{ matrix.platform }}
+        buildMethod: NDream.Unity.Packager.Export
+        allowDirtyBuild: true
+
+    - name: Validate release package
+      if: matrix.is_release == true
+      run: |
+        filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
+        if [ ! -f "$filepath" ]; then
+          echo "Build validation of airconsole-unity-plugin-v${{ env.version }}.unitypackage failed"
+          exit 1
+        fi
+
     # Return License
-    # - name: Return license
-    #   uses: game-ci/unity-return-license@v2
-    #   if: always()
-    #
-    # - name: Validate release package
-    #   if: matrix.platform == 'WebGL' && matrix.unityVersion == '2022.3.61f1'
-    #   run: |
-    #     filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
-    #     if [ ! -f "$filepath" ]; then
-    #       echo "Build validation of airconsole-unity-plugin-v${{ env.version }}unitypackage failed"
-    #       exit 1
-    #     fi
+    - name: Return license
+      uses: game-ci/unity-return-license@v2
+      if: always()
 
-    # - name: Commit and Push
-    #   run: |
-    #     git config user.name "GitHub Actions"
-    #     git config user.email "github-actions@github.com"
-    #     git commit -m "e: Update Release package to v${{ env.version }}"
-    #     git push
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      if: matrix.is_release == true && inputs.dry_run == false
+      with:
+        tag_name: v${{ env.version }}
+        name: Release v${{ env.version }}
+        files: Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage
+        body: ${{ steps.extract-release-notes.outputs.release_notes }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # - name: Create GitHub Release
-    #   uses: softprops/action-gh-release@v1
-    #   if: startsWith(github.ref, 'refs/tags/')
-    #   with:
-    #     files: Builds/release-${{ github.event.inputs.version }}.unitypackage
-    #     body: ${{ steps.extract-release-notes.outputs.release_notes }}
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Dry Run - Show Release Info
+      if: matrix.is_release == true && inputs.dry_run == true
+      run: |
+        echo "=== DRY RUN MODE ==="
+        echo "Would create release with:"
+        echo "Tag: v${{ env.version }}"
+        echo "Name: Release v${{ env.version }}"
+        echo "Files: Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
+        echo "Release notes: ${{ steps.extract-release-notes.outputs.release_notes }}"
+        echo "==================="

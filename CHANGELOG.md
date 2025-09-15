@@ -9,6 +9,9 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 ### Changed
 
 - Minimum Versions: The Unity minimum versions have been updated to match `CVE-2025-59489` fix versions.
+### Added
+
+- **CI/CD**: Unity Builder class for automated builds in CI/CD pipelines supporting WebGL and Android platforms with proper configuration validation.
 
 ### Removed
 
