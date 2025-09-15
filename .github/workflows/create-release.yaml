@@ -22,19 +22,15 @@ jobs:
           - unityVersion: 2022.3.62f1
             platform: WebGL
             is_release: true
-            generates_package: true
           - unityVersion: 2022.3.62f1
             platform: Android
             is_release: false
-            generates_package: false
           - unityVersion: 6000.0.50f1
             platform: WebGL
             is_release: false
-            generates_package: false
           - unityVersion: 6000.0.50f1
             platform: Android
             is_release: false
-            generates_package: false
 
     steps:
     - name: Show Configuration
@@ -43,7 +39,6 @@ jobs:
         echo "Unity Version: ${{ matrix.unityVersion }}"
         echo "Platform: ${{ matrix.platform }}"
         echo "Is Release: ${{ matrix.is_release }}"
-        echo "Generates Package: ${{ matrix.generates_package }}"
         echo "Dry Run Mode: ${{ inputs.dry_run }}"
         echo "=========================="
 
@@ -163,7 +158,7 @@ jobs:
         UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
         UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      if: matrix.generates_package == true
+      if: matrix.is_release == true
       with:
         unityVersion: ${{ matrix.unityVersion }}
         targetPlatform: ${{ matrix.platform }}
@@ -171,7 +166,7 @@ jobs:
         allowDirtyBuild: true
 
     - name: Validate release package
-      if: matrix.generates_package == true
+      if: matrix.is_release == true
       run: |
         filepath="Builds/airconsole-unity-plugin-v${{ env.version }}.unitypackage"
         if [ ! -f "$filepath" ]; then

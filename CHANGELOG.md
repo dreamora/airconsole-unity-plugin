@@ -6,6 +6,10 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- **CI/CD**: Unity Builder class for automated builds in CI/CD pipelines supporting WebGL and Android platforms with proper configuration validation.
+
 ### Removed
 
 - **Android**: The android library no longer manages AudioFocus or overriding the usage from USAGE_GAME.
