@@ -1,0 +1,206 @@
+/* Main container styles */
+.main-scroll-view {
+    padding: 10px;
+}
+
+/* Header styles */
+.header {
+    font-size: 16px;
+    -unity-font-style: bold;
+    margin-bottom: 10px;
+}
+
+.description {
+    font-size: 12px;
+    color: rgba(112, 112, 112, 1);
+    margin-bottom: 20px;
+    white-space: normal;
+}
+
+/* Apply All button styles */
+.apply-all-button {
+    margin-bottom: 20px;
+    background-color: rgba(51, 153, 51, 1);
+    color: rgba(255, 255, 255, 1);
+    height: 30px;
+    border-radius: 4px;
+    border-width: 0;
+}
+
+.apply-all-button:hover {
+    background-color: rgba(34, 136, 34, 1);
+}
+
+/* Section header styles */
+.section-header {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    -unity-font-style: bold;
+    font-size: 16px;
+}
+
+/* Recommendations container */
+.recommendations-container {
+    margin-bottom: 10px;
+}
+
+/* Individual recommendation item styles */
+.recommendation-item {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(76, 76, 76, 0.5);
+}
+
+/* Status indicator (colored circle) */
+.status-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    margin-right: 10px;
+    background-color: rgba(255, 153, 0, 1); /* Orange for needs attention */
+}
+
+.status-indicator.compliant {
+    background-color: rgba(51, 204, 51, 1); /* Green for compliant */
+}
+
+/* Content container that holds title and description */
+.content-container {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+/* Recommendation title */
+.recommendation-title {
+    -unity-font-style: bold;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+/* Recommendation description */
+.recommendation-description {
+    font-size: 12px;
+    color: rgba(204, 204, 204, 1);
+    white-space: normal;
+}
+
+/* Apply button styles */
+.apply-button {
+    margin-left: 10px;
+    min-width: 60px;
+    height: 24px;
+    border-radius: 3px;
+    background-color: rgba(64, 64, 64, 1);
+    color: rgba(255, 255, 255, 1);
+    border-width: 1px;
+    border-color: rgba(96, 96, 96, 1);
+}
+
+.apply-button:hover {
+    background-color: rgba(80, 80, 80, 1);
+}
+
+.apply-button:active {
+    background-color: rgba(48, 48, 48, 1);
+}
+
+/* Status checkmark for compliant items */
+.status-checkmark {
+    color: rgba(51, 204, 51, 1);
+    font-size: 16px;
+    margin-left: 10px;
+    min-width: 60px;
+    -unity-text-align: middle-center;
+}
+
+/* Refresh button styles */
+.refresh-button {
+    margin-top: 20px;
+    height: 28px;
+    border-radius: 4px;
+    background-color: rgba(64, 64, 64, 1);
+    color: rgba(255, 255, 255, 1);
+    border-width: 1px;
+    border-color: rgba(96, 96, 96, 1);
+}
+
+.refresh-button:hover {
+    background-color: rgba(80, 80, 80, 1);
+}
+
+.refresh-button:active {
+    background-color: rgba(48, 48, 48, 1);
+}
+
+/* Hidden elements */
+.hidden {
+    display: none;
+}
+
+/* Dark mode adjustments */
+.unity-editor-dark .header {
+    color: rgba(210, 210, 210, 1);
+}
+
+.unity-editor-dark .description {
+    color: rgba(180, 180, 180, 1);
+}
+
+.unity-editor-dark .section-header {
+    color: rgba(210, 210, 210, 1);
+}
+
+.unity-editor-dark .recommendation-title {
+    color: rgba(210, 210, 210, 1);
+}
+
+.unity-editor-dark .recommendation-description {
+    color: rgba(170, 170, 170, 1);
+}
+
+/* Light mode adjustments */
+.unity-editor-light .header {
+    color: rgba(51, 51, 51, 1);
+}
+
+.unity-editor-light .description {
+    color: rgba(102, 102, 102, 1);
+}
+
+.unity-editor-light .section-header {
+    color: rgba(51, 51, 51, 1);
+}
+
+.unity-editor-light .recommendation-title {
+    color: rgba(51, 51, 51, 1);
+}
+
+.unity-editor-light .recommendation-description {
+    color: rgba(85, 85, 85, 1);
+}
+
+.unity-editor-light .apply-button {
+    background-color: rgba(220, 220, 220, 1);
+    color: rgba(51, 51, 51, 1);
+    border-color: rgba(170, 170, 170, 1);
+}
+
+.unity-editor-light .apply-button:hover {
+    background-color: rgba(200, 200, 200, 1);
+}
+
+.unity-editor-light .refresh-button {
+    background-color: rgba(220, 220, 220, 1);
+    color: rgba(51, 51, 51, 1);
+    border-color: rgba(170, 170, 170, 1);
+}
+
+.unity-editor-light .refresh-button:hover {
+    background-color: rgba(200, 200, 200, 1);
+}
