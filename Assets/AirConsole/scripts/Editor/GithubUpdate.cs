@@ -633,6 +633,36 @@ namespace NDream.AirConsole.Editor {
             }
         }
 
+        /// <summary>
+        /// Updates the plugin from GitHub without showing the confirmation dialog
+        /// Used when confirmation has already been obtained from the UI
+        /// </summary>
+        internal static void UpdatePluginFromGithubWithoutConfirmation() {
+            try {
+                EditorUtility.DisplayProgressBar("AirConsole", "Checking latest release…", 0.1f);
+                GithubRelease release = GetLatestRelease();
+                if (release == null) {
+                    EditorUtility.DisplayDialog("AirConsole", "Failed to retrieve release info.", "OK");
+                    return;
+                }
+
+                // Skip the ConfirmUpdate step since confirmation was already obtained
+                GithubAsset package = FindDownloadableAsset(release);
+                if (package == null) {
+                    HandleNoDownloadableAsset(release);
+                    return;
+                }
+
+                DownloadAndImportPackage(package);
+
+            } catch (Exception ex) {
+                AirConsoleLogger.LogError(() => $"Update failed: {ex.Message}");
+                EditorUtility.DisplayDialog("AirConsole", "Update failed. See console for details.", "OK");
+            } finally {
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
         private static GithubRelease GetLatestRelease() {
             if (_cachedLatestRelease != null) {
                 return _cachedLatestRelease;

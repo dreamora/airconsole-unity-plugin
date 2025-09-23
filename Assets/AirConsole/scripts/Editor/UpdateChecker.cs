@@ -416,6 +416,22 @@ namespace NDream.AirConsole.Editor {
         }
 
         /// <summary>
+        /// Downloads and installs the latest plugin update from GitHub without showing confirmation dialog.
+        /// Use this when confirmation has already been obtained from the UI.
+        /// </summary>
+        /// <returns>True if the update process was initiated successfully</returns>
+        public static bool DownloadAndInstallUpdateWithoutConfirmation() {
+            try {
+                GithubUpdate.UpdatePluginFromGithubWithoutConfirmation();
+                AirConsoleLogger.Log(() => "Update download and installation initiated (confirmation already obtained).");
+                return true;
+            } catch (Exception ex) {
+                AirConsoleLogger.LogError(() => $"Failed to initiate update download: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Opens the GitHub releases page in the default browser as a fallback option
         /// </summary>
         public static void OpenReleasePage() {
