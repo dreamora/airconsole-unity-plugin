@@ -558,14 +558,14 @@ namespace NDream.AirConsole.Editor {
 
                     AirConsoleLogger.Log(() => $"New update detected: v{currentLatestVersion}.");
 
-                    // Auto-open settings window if enabled
+                    // Auto-open update checker window if enabled
                     if (settings.AutoOpenSettingsWindow) {
-                        AirConsoleLogger.Log(() => "Auto-opening AirConsole Settings window to show update notification.");
+                        AirConsoleLogger.Log(() => "Auto-opening AirConsole Update Checker window to show update notification.");
                         EditorApplication.delayCall += () => {
-                            SettingWindow.OpenSettingsWindow();
+                            UpdateCheckerWindow.ShowWindow();
                         };
                     } else {
-                        AirConsoleLogger.Log(() => "Auto-open settings window is disabled. Update notification available in AirConsole Settings.");
+                        AirConsoleLogger.Log(() => "Auto-open update checker window is disabled. Update notification available in AirConsole Update Checker.");
                     }
 
                     // Remember this version so we don't repeatedly open the window

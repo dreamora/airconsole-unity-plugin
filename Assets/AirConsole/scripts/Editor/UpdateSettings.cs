@@ -16,7 +16,7 @@ namespace NDream.AirConsole.Editor {
         [SerializeField] private string lastCheckTime = ""; // DateTime serialized as string
         [SerializeField] private string dismissedVersion = "";
         [SerializeField] private bool checkOnStartup = true;
-        [SerializeField] private bool autoOpenSettingsWindow = true; // Auto-open settings window when update is available
+        [SerializeField] private bool autoOpenSettingsWindow = true; // Auto-open update checker window when update is available
         [SerializeField] private int failedCheckCount = 0; // Track consecutive failures for backoff
         [SerializeField] private string lastErrorMessage = ""; // Last error message for debugging
         [SerializeField] private string lastErrorTime = ""; // When the last error occurred
@@ -80,7 +80,7 @@ namespace NDream.AirConsole.Editor {
         }
 
         /// <summary>
-        /// Gets or sets whether to automatically open the settings window when an update is available
+        /// Gets or sets whether to automatically open the update checker window when an update is available
         /// </summary>
         public bool AutoOpenSettingsWindow {
             get => autoOpenSettingsWindow;
