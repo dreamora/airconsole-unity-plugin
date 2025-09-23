@@ -161,11 +161,18 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void DismissedVersion_CanBeSetAndRetrieved() {
             // Test requirement 4.5: Settings persistence
-            settings.DismissedVersion = "2.7.0";
-            Assert.AreEqual("2.7.0", settings.DismissedVersion, "Should store dismissed version");
+            string originalDismissedVersion = settings.DismissedVersion;
 
-            settings.DismissedVersion = null;
-            Assert.AreEqual("", settings.DismissedVersion, "Should handle null as empty string");
+            try {
+                settings.DismissedVersion = "2.7.0";
+                Assert.AreEqual("2.7.0", settings.DismissedVersion, "Should store dismissed version");
+
+                settings.DismissedVersion = null;
+                Assert.AreEqual("", settings.DismissedVersion, "Should handle null as empty string");
+            } finally {
+                // Restore original state (though this is a fresh instance, it's good practice)
+                settings.DismissedVersion = originalDismissedVersion;
+            }
         }
 
         [Test]

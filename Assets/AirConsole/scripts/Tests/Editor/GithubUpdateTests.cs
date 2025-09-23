@@ -63,13 +63,19 @@ namespace NDream.AirConsole.Editor.Tests {
             // Arrange
             Version version = new Version(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
+            string originalDismissedVersion = settings.DismissedVersion;
             settings.DismissedVersion = version.ToString();
 
-            // Act
-            bool result = GithubUpdate.IsVersionDismissed(version);
+            try {
+                // Act
+                bool result = GithubUpdate.IsVersionDismissed(version);
 
-            // Assert
-            Assert.IsTrue(result);
+                // Assert
+                Assert.IsTrue(result);
+            } finally {
+                // Cleanup
+                settings.DismissedVersion = originalDismissedVersion;
+            }
         }
 
         [Test]
@@ -77,13 +83,19 @@ namespace NDream.AirConsole.Editor.Tests {
             // Arrange
             Version version = new Version(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
+            string originalDismissedVersion = settings.DismissedVersion;
             settings.DismissedVersion = "2.0.0";
 
-            // Act
-            bool result = GithubUpdate.IsVersionDismissed(version);
+            try {
+                // Act
+                bool result = GithubUpdate.IsVersionDismissed(version);
 
-            // Assert
-            Assert.IsFalse(result);
+                // Assert
+                Assert.IsFalse(result);
+            } finally {
+                // Cleanup
+                settings.DismissedVersion = originalDismissedVersion;
+            }
         }
 
         [Test]
@@ -91,12 +103,18 @@ namespace NDream.AirConsole.Editor.Tests {
             // Arrange
             Version version = new Version(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
+            string originalDismissedVersion = settings.DismissedVersion;
 
-            // Act
-            GithubUpdate.DismissVersion(version);
+            try {
+                // Act
+                GithubUpdate.DismissVersion(version);
 
-            // Assert
-            Assert.AreEqual(version.ToString(), settings.DismissedVersion);
+                // Assert
+                Assert.AreEqual(version.ToString(), settings.DismissedVersion);
+            } finally {
+                // Cleanup
+                settings.DismissedVersion = originalDismissedVersion;
+            }
         }
 
         [Test]

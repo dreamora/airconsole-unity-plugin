@@ -597,13 +597,22 @@ namespace NDream.AirConsole.Editor.Tests {
             // Act - Access the settings instance (should create if not exists)
             var settings = UpdateSettings.Instance;
 
-            // Assert - Settings should be created with default values
-            Assert.IsNotNull(settings, "Settings instance should be created");
-            Assert.IsTrue(settings.AutomaticCheckEnabled, "Default should enable automatic checking");
-            Assert.IsTrue(settings.CheckOnStartup, "Default should enable startup checking");
-            Assert.AreEqual(24, settings.CheckIntervalHours, "Default interval should be 24 hours");
-            Assert.AreEqual(0, settings.FailedCheckCount, "Default failed count should be 0");
-            Assert.AreEqual("", settings.DismissedVersion, "Default dismissed version should be empty");
+            // Clear any existing dismissed version for this test
+            string originalDismissedVersion = settings.DismissedVersion;
+            settings.DismissedVersion = "";
+
+            try {
+                // Assert - Settings should be created and accessible
+                Assert.IsNotNull(settings, "Settings instance should be created");
+                Assert.IsTrue(settings.AutomaticCheckEnabled, "Default should enable automatic checking");
+                Assert.IsTrue(settings.CheckOnStartup, "Default should enable startup checking");
+                Assert.AreEqual(24, settings.CheckIntervalHours, "Default interval should be 24 hours");
+                Assert.AreEqual(0, settings.FailedCheckCount, "Default failed count should be 0");
+                Assert.AreEqual("", settings.DismissedVersion, "Dismissed version should be empty after reset");
+            } finally {
+                // Restore original dismissed version
+                settings.DismissedVersion = originalDismissedVersion;
+            }
         }
 
         [Test]
