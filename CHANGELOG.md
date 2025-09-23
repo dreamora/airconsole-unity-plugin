@@ -16,8 +16,25 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - **Editor**: Add the ability to update the AirConsole Unity Plugin with a click from the inspector directly.
+- **Editor**: Enhanced plugin update checker UI with comprehensive polish improvements:
+  - Consistent AirConsole branding and color scheme throughout the settings window
+  - Three-tier button hierarchy (Primary/Secondary/Small) for better visual organization
+  - Comprehensive tooltip system for all interactive elements with helpful descriptions
+  - Smooth banner animations and loading indicators for update notifications
+  - Confirmation dialogs for important actions (update installation, dismiss notifications, reset settings)
+  - Responsive layout that adapts to different window sizes with minimum size enforcement (400x300)
+  - Proper container structure with no overlapping elements between headers and content
+  - Collapsible sections with proper state management for better organization
+  - Scrolling support for smaller windows to ensure all content remains accessible
+  - Streamlined update process with single confirmation dialog to eliminate popup spam
 
 ### Fixed
+
+- **Editor**: Fixed excessive popup dialogs during plugin update process - now shows only one confirmation dialog
+- **Editor**: Fixed button layout inconsistencies with proper alignment and consistent spacing throughout UI
+- **Editor**: Fixed container structure overlaps where section headers conflicted with container boundaries
+- **Editor**: Fixed unit tests that required manual dialog interaction, making all tests fully automated
+- **Editor**: Fixed reset settings showing unnecessary success confirmation - user can see changes in UI
 
 ## [2.6.1] - 2025-09-02
 
