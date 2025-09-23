@@ -9,6 +9,9 @@ namespace NDream.AirConsole.Editor.Tests {
     /// <summary>
     /// NUnit tests for UpdateChecker static class
     /// Tests the main API interface for the AirConsole plugin update checking system
+    ///
+    /// NOTE: Tests avoid calling methods that show UI dialogs (like DownloadAndInstallUpdate)
+    /// to prevent blocking automated test runs. Instead, we test method signatures and non-UI functionality.
     /// </summary>
     [Category("UpdateChecker")]
     public class UpdateCheckerTests {
@@ -369,10 +372,27 @@ namespace NDream.AirConsole.Editor.Tests {
         #region Update Installation Tests
 
         [Test]
-        public void DownloadAndInstallUpdate_DoesNotThrow() {
-            // Act & Assert - Test that the method doesn't throw exceptions
-            // Note: This will show UI dialogs in actual use, but shouldn't throw
-            Assert.DoesNotThrow(() => UpdateChecker.DownloadAndInstallUpdate());
+        public void DownloadAndInstallUpdate_MethodExists() {
+            // Test that the method exists and has correct signature without calling it
+            // This avoids UI dialogs during unit tests
+            var method = typeof(UpdateChecker).GetMethod("DownloadAndInstallUpdate",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+            Assert.IsNotNull(method, "DownloadAndInstallUpdate method should exist");
+            Assert.AreEqual(typeof(bool), method.ReturnType, "Method should return boolean");
+            Assert.AreEqual(0, method.GetParameters().Length, "Method should take no parameters");
+        }
+
+        [Test]
+        public void DownloadAndInstallUpdateWithoutConfirmation_MethodExists() {
+            // Test that the new method exists and has correct signature without calling it
+            // This avoids UI dialogs during unit tests
+            var method = typeof(UpdateChecker).GetMethod("DownloadAndInstallUpdateWithoutConfirmation",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+            Assert.IsNotNull(method, "DownloadAndInstallUpdateWithoutConfirmation method should exist");
+            Assert.AreEqual(typeof(bool), method.ReturnType, "Method should return boolean");
+            Assert.AreEqual(0, method.GetParameters().Length, "Method should take no parameters");
         }
 
         [Test]
@@ -667,7 +687,7 @@ namespace NDream.AirConsole.Editor.Tests {
             Assert.DoesNotThrow(() => UpdateChecker.ClearDismissedVersion());
             Assert.DoesNotThrow(() => UpdateChecker.IsVersionDismissed(null));
             Assert.DoesNotThrow(() => UpdateChecker.IsVersionDismissed(new Version(1, 0, 0)));
-            Assert.DoesNotThrow(() => UpdateChecker.DownloadAndInstallUpdate());
+            // Removed DownloadAndInstallUpdate() call to avoid UI dialogs in unit tests
             Assert.DoesNotThrow(() => UpdateChecker.OpenReleasePage());
             Assert.DoesNotThrow(() => UpdateChecker.OpenLatestReleasePage());
         }
