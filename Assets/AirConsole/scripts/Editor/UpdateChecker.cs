@@ -197,22 +197,12 @@ namespace NDream.AirConsole.Editor {
         /// Validates and enforces check interval constraints
         /// </summary>
         /// <param name="requestedIntervalHours">The requested check interval in hours</param>
-        /// <returns>The validated interval (minimum 24 hours)</returns>
+        /// <returns>The validated interval (fixed at 12 hours)</returns>
         public static int ValidateCheckInterval(int requestedIntervalHours) {
-            const int minimumInterval = 24;
-            const int maximumInterval = 168; // 1 week
+            const int fixedInterval = 12; // Fixed 12-hour interval
 
-            if (requestedIntervalHours < minimumInterval) {
-                AirConsoleLogger.LogWarning(() => $"Check interval {requestedIntervalHours}h is below minimum. Using {minimumInterval}h instead.");
-                return minimumInterval;
-            }
-
-            if (requestedIntervalHours > maximumInterval) {
-                AirConsoleLogger.LogWarning(() => $"Check interval {requestedIntervalHours}h is above maximum. Using {maximumInterval}h instead.");
-                return maximumInterval;
-            }
-
-            return requestedIntervalHours;
+            // Always return the fixed interval regardless of input
+            return fixedInterval;
         }
 
         /// <summary>

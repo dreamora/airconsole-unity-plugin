@@ -144,48 +144,7 @@ namespace NDream.AirConsole.Editor {
 
 
 
-        /// <summary>
-        /// Draws a minimal update settings section that directs users to the dedicated UpdateCheckerWindow
-        /// </summary>
-        private void DrawUpdateSettingsSection() {
-            var settings = UpdateSettings.Instance;
 
-            // Minimal update settings section
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Update Settings", EditorStyles.boldLabel);
-            GUILayout.FlexibleSpace();
-
-            // Quick status indicator
-            if (settings.AutomaticCheckEnabled) {
-                EditorGUILayout.LabelField("✓ Enabled", _helpTextStyle, GUILayout.Width(60));
-            } else {
-                EditorGUILayout.LabelField("✗ Disabled", _helpTextStyle, GUILayout.Width(60));
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(3);
-
-            // Direct users to the dedicated UpdateCheckerWindow
-            EditorGUILayout.LabelField("For detailed update management, use the dedicated Update Checker window.",
-                _helpTextStyle ?? EditorStyles.miniLabel);
-
-            EditorGUILayout.Space(5);
-
-            EditorGUILayout.BeginHorizontal();
-
-            // Button to open the dedicated UpdateCheckerWindow
-            var openUpdateCheckerContent = new GUIContent("Open Update Checker", "Open the dedicated Update Checker window for full update management");
-            if (GUILayout.Button(openUpdateCheckerContent, _primaryButtonStyle ?? GUI.skin.button, GUILayout.Width(150))) {
-                UpdateCheckerWindow.ShowWindow();
-            }
-
-            GUILayout.FlexibleSpace();
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.EndVertical();
-        }
 
 
 
@@ -230,9 +189,6 @@ namespace NDream.AirConsole.Editor {
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(5);
-
-            // Update Settings Section
-            DrawUpdateSettingsSection();
 
             EditorGUILayout.Space(10);
 

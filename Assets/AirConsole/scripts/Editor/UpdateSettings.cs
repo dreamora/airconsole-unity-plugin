@@ -8,11 +8,11 @@ namespace NDream.AirConsole.Editor {
     /// </summary>
     [CreateAssetMenu(fileName = "UpdateSettings", menuName = "AirConsole/Update Settings")]
     public class UpdateSettings : ScriptableObject {
-        private const int MINIMUM_CHECK_INTERVAL_HOURS = 24;
+        private const int FIXED_CHECK_INTERVAL_HOURS = 12;
         private const string SETTINGS_ASSET_PATH = "Assets/AirConsole/resources/UpdateSettings.asset";
 
         [SerializeField] private bool automaticCheckEnabled = true;
-        [SerializeField] private int checkIntervalHours = 24; // Minimum 24 hours to prevent rate limiting
+        [SerializeField] private int checkIntervalHours = 12; // Fixed 12-hour interval
         [SerializeField] private string lastCheckTime = ""; // DateTime serialized as string
         [SerializeField] private string dismissedVersion = "";
         [SerializeField] private bool checkOnStartup = true;
@@ -25,23 +25,25 @@ namespace NDream.AirConsole.Editor {
         private static UpdateSettings _instance;
 
         /// <summary>
-        /// Gets or sets whether automatic update checking is enabled
+        /// Gets whether automatic update checking is enabled (always true)
         /// </summary>
         public bool AutomaticCheckEnabled {
-            get => automaticCheckEnabled;
+            get => true; // Always enabled
             set {
-                automaticCheckEnabled = value;
+                // Ignore attempts to disable - always keep enabled
+                automaticCheckEnabled = true;
                 MarkDirty();
             }
         }
 
         /// <summary>
-        /// Gets or sets the check interval in hours (minimum 24 hours)
+        /// Gets the check interval in hours (fixed at 12 hours)
         /// </summary>
         public int CheckIntervalHours {
-            get => Mathf.Max(MINIMUM_CHECK_INTERVAL_HOURS, checkIntervalHours);
+            get => 12; // Fixed 12-hour interval
             set {
-                checkIntervalHours = Mathf.Max(MINIMUM_CHECK_INTERVAL_HOURS, value);
+                // Ignore attempts to change - always use 12 hours
+                checkIntervalHours = 12;
                 MarkDirty();
             }
         }
@@ -69,23 +71,25 @@ namespace NDream.AirConsole.Editor {
         }
 
         /// <summary>
-        /// Gets or sets whether to check on startup
+        /// Gets whether to check on startup (always true)
         /// </summary>
         public bool CheckOnStartup {
-            get => checkOnStartup;
+            get => true; // Always check on startup
             set {
-                checkOnStartup = value;
+                // Ignore attempts to disable - always keep enabled
+                checkOnStartup = true;
                 MarkDirty();
             }
         }
 
         /// <summary>
-        /// Gets or sets whether to automatically open the update checker window when an update is available
+        /// Gets whether to automatically open the update checker window when an update is available (always true)
         /// </summary>
         public bool AutoOpenSettingsWindow {
-            get => autoOpenSettingsWindow;
+            get => true; // Always auto-open
             set {
-                autoOpenSettingsWindow = value;
+                // Ignore attempts to disable - always keep enabled
+                autoOpenSettingsWindow = true;
                 MarkDirty();
             }
         }
@@ -312,11 +316,12 @@ namespace NDream.AirConsole.Editor {
         /// Validates settings on load
         /// </summary>
         private void OnEnable() {
-            // Ensure minimum interval is respected
-            if (checkIntervalHours < MINIMUM_CHECK_INTERVAL_HOURS) {
-                checkIntervalHours = MINIMUM_CHECK_INTERVAL_HOURS;
-                MarkDirty();
-            }
+            // Ensure fixed settings are applied
+            automaticCheckEnabled = true;
+            checkIntervalHours = FIXED_CHECK_INTERVAL_HOURS;
+            checkOnStartup = true;
+            autoOpenSettingsWindow = true;
+            MarkDirty();
         }
     }
 }

@@ -34,7 +34,7 @@ namespace NDream.AirConsole.Editor {
         public static void ShowWindow() {
             UpdateCheckerWindow window = GetWindow<UpdateCheckerWindow>("AirConsole Update Checker");
             window.titleContent = new GUIContent("Update Checker", logoSmall, "AirConsole Update Checker");
-            window.minSize = new Vector2(400, 300);
+            window.minSize = new Vector2(400, 200);
             window.Show();
             window.Focus();
         }
@@ -47,7 +47,7 @@ namespace NDream.AirConsole.Editor {
             titleInfo = new GUIContent("AirConsole Update Checker", logoSmall, "AirConsole Update Checker");
 
             // Set minimum window size for responsive layout
-            minSize = new Vector2(400, 300);
+            minSize = new Vector2(400, 200);
 
             // Reset style initialization flag so styles are recreated in OnGUI
             _stylesInitialized = false;
@@ -130,7 +130,6 @@ namespace NDream.AirConsole.Editor {
             DrawHeader();
             DrawCurrentStatus();
             DrawUpdateActions();
-            DrawUpdateSettings();
 
             EditorGUILayout.EndScrollView();
         }
@@ -199,6 +198,11 @@ namespace NDream.AirConsole.Editor {
                 var originalColor = GUI.color;
                 GUI.color = new Color(0.2f, 0.8f, 0.2f); // Green color for update available
                 EditorGUILayout.LabelField("✓ Update Available", _statusStyle ?? EditorStyles.label);
+                GUI.color = originalColor;
+            } else if (UpdateChecker.IsCurrentUpdateDismissed) {
+                var originalColor = GUI.color;
+                GUI.color = new Color(0.8f, 0.6f, 0.2f); // Orange color for dismissed updates
+                EditorGUILayout.LabelField("⚠ Updates Dismissed", _statusStyle ?? EditorStyles.label);
                 GUI.color = originalColor;
             } else if (latestVersion != null) {
                 var originalColor = GUI.color;
@@ -312,38 +316,6 @@ namespace NDream.AirConsole.Editor {
         /// Draws the actions available when an update is available
         /// </summary>
         private void DrawUpdateAvailableActions(Version latestVersion) {
-            var currentVersion = UpdateChecker.CurrentVersion;
-
-            // Version comparison display
-            var windowWidth = position.width;
-            if (windowWidth > 500) {
-                // Wide layout: horizontal version display
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"Current: v{currentVersion}", GUILayout.Width(150));
-                EditorGUILayout.LabelField("→", GUILayout.Width(20));
-                EditorGUILayout.LabelField($"Available: v{latestVersion}", GUILayout.Width(150));
-                GUILayout.FlexibleSpace();
-                EditorGUILayout.EndHorizontal();
-            } else {
-                // Narrow layout: vertical version display
-                EditorGUILayout.LabelField($"Current: v{currentVersion}");
-                EditorGUILayout.LabelField($"Available: v{latestVersion}");
-            }
-
-            EditorGUILayout.Space(5);
-
-            // Update priority indicator
-            var versionDiff = GetVersionDifference(currentVersion, latestVersion);
-            if (versionDiff.isMajor) {
-                EditorGUILayout.LabelField("🔴 Major Update - Recommended", _helpTextStyle ?? EditorStyles.miniLabel);
-            } else if (versionDiff.isMinor) {
-                EditorGUILayout.LabelField("🟡 Minor Update - New features available", _helpTextStyle ?? EditorStyles.miniLabel);
-            } else {
-                EditorGUILayout.LabelField("🟢 Patch Update - Bug fixes available", _helpTextStyle ?? EditorStyles.miniLabel);
-            }
-
-            EditorGUILayout.Space(8);
-
             // Action buttons
             EditorGUILayout.BeginHorizontal();
 
@@ -367,107 +339,21 @@ namespace NDream.AirConsole.Editor {
 
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(5);
-            EditorGUILayout.LabelField("💡 Tip: Updates include bug fixes, new features, and performance improvements.",
-                _helpTextStyle ?? EditorStyles.miniLabel);
         }
 
         /// <summary>
         /// Draws the actions available when no update is available
         /// </summary>
         private void DrawNoUpdateActions() {
-            EditorGUILayout.LabelField("✓ You have the latest version installed.", _statusStyle ?? EditorStyles.label);
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("💡 Check back later for new updates, or enable automatic checking below.",
-                _helpTextStyle ?? EditorStyles.miniLabel);
+            // Check if there are dismissed updates
+            if (UpdateChecker.IsCurrentUpdateDismissed) {
+                EditorGUILayout.LabelField("ℹ️ Updates have been dismissed.", _statusStyle ?? EditorStyles.label);
+            } else {
+                EditorGUILayout.LabelField("✓ You have the latest version installed.", _statusStyle ?? EditorStyles.label);
+            }
         }
 
-        /// <summary>
-        /// Draws the update settings section
-        /// </summary>
-        private void DrawUpdateSettings() {
-            var settings = UpdateSettings.Instance;
 
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-
-            EditorGUILayout.LabelField("Update Settings", _sectionHeaderStyle ?? EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            // Automatic update checking toggle
-            var automaticCheckContent = new GUIContent(
-                "Automatic Update Checking",
-                "When enabled, the plugin will periodically check for updates from GitHub"
-            );
-            var newAutomaticEnabled = EditorGUILayout.Toggle(automaticCheckContent, settings.AutomaticCheckEnabled);
-            if (newAutomaticEnabled != settings.AutomaticCheckEnabled) {
-                settings.AutomaticCheckEnabled = newAutomaticEnabled;
-                UpdateChecker.RestartAutomaticChecking();
-            }
-
-            if (!settings.AutomaticCheckEnabled) {
-                EditorGUILayout.LabelField("ℹ️ You can still check for updates manually using the button above.",
-                    _helpTextStyle ?? EditorStyles.miniLabel);
-            }
-
-            // Check interval setting (only show if automatic checking is enabled)
-            if (settings.AutomaticCheckEnabled) {
-                EditorGUI.indentLevel++;
-
-                var intervalContent = new GUIContent(
-                    "Check Interval (hours)",
-                    "How often to check for updates. Minimum 24 hours to respect GitHub API limits."
-                );
-                var newInterval = EditorGUILayout.IntSlider(intervalContent, settings.CheckIntervalHours, 24, 168); // 24 hours to 1 week
-                if (newInterval != settings.CheckIntervalHours) {
-                    settings.CheckIntervalHours = newInterval;
-                }
-
-                EditorGUILayout.LabelField($"  = Every {GetIntervalDescription(settings.CheckIntervalHours)}",
-                    _helpTextStyle ?? EditorStyles.miniLabel);
-
-                EditorGUILayout.Space(3);
-
-                var startupContent = new GUIContent(
-                    "Check on Editor Startup",
-                    "Automatically check for updates when Unity Editor starts (respects rate limiting)"
-                );
-                var newCheckOnStartup = EditorGUILayout.Toggle(startupContent, settings.CheckOnStartup);
-                if (newCheckOnStartup != settings.CheckOnStartup) {
-                    settings.CheckOnStartup = newCheckOnStartup;
-                }
-
-                var autoOpenContent = new GUIContent(
-                    "Auto-open Update Checker Window",
-                    "Automatically open this Update Checker window when a new update is detected"
-                );
-                var newAutoOpenWindow = EditorGUILayout.Toggle(autoOpenContent, settings.AutoOpenSettingsWindow);
-                if (newAutoOpenWindow != settings.AutoOpenSettingsWindow) {
-                    settings.AutoOpenSettingsWindow = newAutoOpenWindow;
-                }
-
-                EditorGUI.indentLevel--;
-            }
-
-            EditorGUILayout.Space(8);
-
-            // Diagnostic information
-            if (settings.FailedCheckCount > 0) {
-                EditorGUILayout.LabelField("Diagnostic Information", EditorStyles.boldLabel);
-                EditorGUILayout.Space(3);
-
-                var diagnosticInfo = settings.GetDiagnosticInfo();
-                EditorGUILayout.LabelField(diagnosticInfo, _helpTextStyle ?? EditorStyles.miniLabel);
-
-                EditorGUILayout.Space(5);
-                if (GUILayout.Button("Reset Error State", _secondaryButtonStyle ?? GUI.skin.button, GUILayout.Width(120))) {
-                    UpdateChecker.ResetErrorState();
-                    Repaint();
-                }
-            }
-
-            EditorGUILayout.EndVertical();
-        }
 
         /// <summary>
         /// Shows confirmation dialog for update installation
@@ -547,19 +433,7 @@ namespace NDream.AirConsole.Editor {
             EditorGUILayout.LabelField(dots[dotIndex], GUILayout.Width(30));
         }
 
-        /// <summary>
-        /// Converts check interval hours to human-readable description
-        /// </summary>
-        private string GetIntervalDescription(int hours) {
-            if (hours < 24) return $"{hours} hours";
-            if (hours == 24) return "day";
-            if (hours == 48) return "2 days";
-            if (hours == 72) return "3 days";
-            if (hours == 168) return "week";
 
-            var days = hours / 24;
-            return $"{days} days";
-        }
 
         /// <summary>
         /// Formats a TimeSpan into a human-readable string
