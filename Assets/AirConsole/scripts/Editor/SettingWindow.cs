@@ -29,9 +29,17 @@ namespace NDream.AirConsole.Editor {
 
         [MenuItem("Window/AirConsole/Settings")]
         private static void Init() {
+            OpenSettingsWindow();
+        }
+
+        /// <summary>
+        /// Opens the AirConsole Settings window, or focuses it if already open
+        /// </summary>
+        public static void OpenSettingsWindow() {
             SettingWindow window = (SettingWindow)GetWindow(typeof(SettingWindow));
             window.titleContent = titleInfo;
             window.Show();
+            window.Focus();
         }
 
         /// <summary>
@@ -220,6 +228,12 @@ namespace NDream.AirConsole.Editor {
                 if (newCheckOnStartup != settings.CheckOnStartup) {
                     settings.CheckOnStartup = newCheckOnStartup;
                 }
+
+                // Auto-open settings window toggle
+                var newAutoOpenWindow = EditorGUILayout.Toggle("Auto-open Settings Window", settings.AutoOpenSettingsWindow);
+                if (newAutoOpenWindow != settings.AutoOpenSettingsWindow) {
+                    settings.AutoOpenSettingsWindow = newAutoOpenWindow;
+                }
                 EditorGUI.indentLevel--;
             }
 
@@ -243,13 +257,9 @@ namespace NDream.AirConsole.Editor {
             // Show check status
             if (isCheckInProgress) {
                 EditorGUILayout.LabelField("Checking for updates...", EditorStyles.miniLabel);
-            } else {
-                EditorGUILayout.LabelField("Manual check available anytime", EditorStyles.miniLabel);
             }
             EditorGUILayout.EndHorizontal();
 
-            // Manual check button - allow manual checks anytime (not rate limited)
-            EditorGUILayout.BeginHorizontal();
             // Show dismissed updates button (only show if there are dismissed updates)
             if (!UpdateChecker.IsUpdateAvailable && UpdateChecker.IsCurrentUpdateDismissed) {
                 if (GUILayout.Button("Show Dismissed Updates", GUILayout.Width(200))) {
@@ -257,8 +267,6 @@ namespace NDream.AirConsole.Editor {
                     Repaint();
                 }
             }
-
-            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(5);
 

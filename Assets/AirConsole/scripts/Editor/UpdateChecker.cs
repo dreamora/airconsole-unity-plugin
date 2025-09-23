@@ -12,6 +12,8 @@ namespace NDream.AirConsole.Editor {
     public static class UpdateChecker {
         private static bool _automaticCheckingInitialized;
         private static bool _isScheduledCheckPending;
+        private static bool _lastUpdateAvailableState;
+        private static Version _lastNotifiedVersion;
 
         #region Public Properties
 
@@ -60,21 +62,28 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         public static void StartAutomaticChecking() {
             if (_automaticCheckingInitialized) {
+                AirConsoleLogger.Log(() => "UpdateChecker automatic checking already initialized");
                 return;
             }
 
             var settings = UpdateSettings.Instance;
             if (!settings.AutomaticCheckEnabled) {
+                AirConsoleLogger.Log(() => "UpdateChecker automatic checking disabled in settings");
                 return;
             }
 
             _automaticCheckingInitialized = true;
+            AirConsoleLogger.Log(() => "UpdateChecker automatic checking system started");
 
-            // Check on startup if enabled and rate limiting allows
-            if (settings.CheckOnStartup && settings.CanCheckNow()) {
+            // Check on startup if enabled - always allow first startup check to bypass rate limiting
+            if (settings.CheckOnStartup) {
+                AirConsoleLogger.Log(() => "Scheduling startup update check (bypassing rate limiting for editor startup)");
                 EditorApplication.delayCall += () => {
-                    CheckForUpdatesAsync();
+                    // Force startup check to bypass rate limiting - this is the first check after editor startup
+                    CheckForUpdatesAsync(force: true);
                 };
+            } else {
+                AirConsoleLogger.Log(() => "Startup update check disabled in settings");
             }
 
             // Set up periodic checking
@@ -90,6 +99,7 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
+            AirConsoleLogger.Log(() => "UpdateChecker automatic checking system stopped");
             _automaticCheckingInitialized = false;
             _isScheduledCheckPending = false;
             EditorApplication.update -= PeriodicCheckHandler;
@@ -124,6 +134,12 @@ namespace NDream.AirConsole.Editor {
                 return false;
             }
 
+            if (force) {
+                AirConsoleLogger.Log(() => "Update check initiated (rate limiting bypassed)");
+            } else {
+                AirConsoleLogger.Log(() => "Update check initiated");
+            }
+
             // Use the enhanced GithubUpdate method with rate limiting
             return GithubUpdate.BeginBackgroundUpdateCheck(force);
         }
@@ -144,6 +160,8 @@ namespace NDream.AirConsole.Editor {
             return GithubUpdate.TimeUntilNextCheck();
         }
 
+
+
         #endregion
 
         #region Dismiss Functionality
@@ -157,6 +175,9 @@ namespace NDream.AirConsole.Editor {
             if (latestVersion != null) {
                 GithubUpdate.DismissVersion(latestVersion);
                 AirConsoleLogger.Log(() => $"Update v{latestVersion} dismissed. Notifications will not show until a newer version is available.");
+
+                // Reset notification state since user dismissed this version
+                _lastUpdateAvailableState = false;
             }
         }
 
@@ -177,6 +198,10 @@ namespace NDream.AirConsole.Editor {
         public static void ClearDismissedVersion() {
             UpdateSettings.Instance.DismissedVersion = "";
             AirConsoleLogger.Log(() => "Dismissed version cleared. All future updates will show notifications.");
+
+            // Reset notification state so that if an update becomes available again, it will show
+            _lastNotifiedVersion = null;
+            _lastUpdateAvailableState = false;
         }
 
         /// <summary>
@@ -246,6 +271,9 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
+            // Check for update status changes and handle notifications
+            CheckForUpdateStatusChanges();
+
             // Skip if check is already in progress
             if (IsCheckInProgress) {
                 return;
@@ -263,6 +291,41 @@ namespace NDream.AirConsole.Editor {
             }
         }
 
+        /// <summary>
+        /// Checks for changes in update availability and handles notifications
+        /// </summary>
+        private static void CheckForUpdateStatusChanges() {
+            var currentUpdateAvailable = IsUpdateAvailable;
+            var currentLatestVersion = LatestVersion;
+            var settings = UpdateSettings.Instance;
+
+            // Check if update status changed from false to true (new update detected)
+            if (!_lastUpdateAvailableState && currentUpdateAvailable) {
+                // Check if this is a new version we haven't notified about yet
+                if (currentLatestVersion != null &&
+                    (_lastNotifiedVersion == null || currentLatestVersion > _lastNotifiedVersion)) {
+
+                    AirConsoleLogger.Log(() => $"New update detected: v{currentLatestVersion}.");
+
+                    // Auto-open settings window if enabled
+                    if (settings.AutoOpenSettingsWindow) {
+                        AirConsoleLogger.Log(() => "Auto-opening AirConsole Settings window to show update notification.");
+                        EditorApplication.delayCall += () => {
+                            SettingWindow.OpenSettingsWindow();
+                        };
+                    } else {
+                        AirConsoleLogger.Log(() => "Auto-open settings window is disabled. Update notification available in AirConsole Settings.");
+                    }
+
+                    // Remember this version so we don't repeatedly open the window
+                    _lastNotifiedVersion = currentLatestVersion;
+                }
+            }
+
+            // Update the last known state
+            _lastUpdateAvailableState = currentUpdateAvailable;
+        }
+
         #endregion
 
         #region Editor Initialization
@@ -274,7 +337,18 @@ namespace NDream.AirConsole.Editor {
         private static void InitializeOnLoad() {
             // Delay initialization to ensure all systems are ready
             EditorApplication.delayCall += () => {
-                StartAutomaticChecking();
+                try {
+                    // Initialize UpdateSettings first to ensure asset creation
+                    var settings = UpdateSettings.Instance;
+
+                    // Log startup initialization for debugging
+                    AirConsoleLogger.Log(() => $"UpdateChecker initializing on editor startup. AutoCheck: {settings.AutomaticCheckEnabled}, CheckOnStartup: {settings.CheckOnStartup}");
+
+                    // Start automatic checking system
+                    StartAutomaticChecking();
+                } catch (Exception ex) {
+                    AirConsoleLogger.LogError(() => $"Failed to initialize UpdateChecker on startup: {ex.Message}");
+                }
             };
         }
 

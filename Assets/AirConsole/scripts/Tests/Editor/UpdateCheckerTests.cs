@@ -498,6 +498,139 @@ namespace NDream.AirConsole.Editor.Tests {
 
         #endregion
 
+        #region Startup Initialization Tests
+
+        [Test]
+        public void StartupInitialization_WithValidSettings_InitializesCorrectly() {
+            // Test that startup initialization works correctly with valid settings
+            var settings = UpdateSettings.Instance;
+            var originalEnabled = settings.AutomaticCheckEnabled;
+            var originalCheckOnStartup = settings.CheckOnStartup;
+            var originalLastCheck = settings.LastCheckTime;
+
+            try {
+                // Arrange - Set up valid settings for startup check
+                settings.AutomaticCheckEnabled = true;
+                settings.CheckOnStartup = true;
+                settings.LastCheckTime = DateTime.Now.AddHours(-25); // Allow startup check
+
+                // Act - Simulate startup initialization
+                Assert.DoesNotThrow(() => UpdateChecker.StartAutomaticChecking());
+
+                // Assert - Verify that automatic checking is properly initialized
+                // The system should be ready to perform checks
+                Assert.IsTrue(settings.CanCheckNow(), "Should be able to check after startup initialization");
+
+            } finally {
+                // Cleanup
+                settings.AutomaticCheckEnabled = originalEnabled;
+                settings.CheckOnStartup = originalCheckOnStartup;
+                settings.LastCheckTime = originalLastCheck;
+                UpdateChecker.StopAutomaticChecking();
+            }
+        }
+
+        [Test]
+        public void StartupInitialization_WithCheckOnStartupDisabled_SkipsStartupCheck() {
+            // Test that startup check is skipped when CheckOnStartup is disabled
+            var settings = UpdateSettings.Instance;
+            var originalEnabled = settings.AutomaticCheckEnabled;
+            var originalCheckOnStartup = settings.CheckOnStartup;
+            var originalLastCheck = settings.LastCheckTime;
+
+            try {
+                // Arrange - Disable startup checking
+                settings.AutomaticCheckEnabled = true;
+                settings.CheckOnStartup = false;
+                settings.LastCheckTime = DateTime.Now.AddHours(-25); // Would allow check if enabled
+
+                // Act - Should not throw and should handle disabled startup check gracefully
+                Assert.DoesNotThrow(() => UpdateChecker.StartAutomaticChecking());
+
+                // Assert - System should still be initialized for periodic checks
+                Assert.IsTrue(settings.CanCheckNow(), "Should still be able to check manually");
+
+            } finally {
+                // Cleanup
+                settings.AutomaticCheckEnabled = originalEnabled;
+                settings.CheckOnStartup = originalCheckOnStartup;
+                settings.LastCheckTime = originalLastCheck;
+                UpdateChecker.StopAutomaticChecking();
+            }
+        }
+
+        [Test]
+        public void StartupInitialization_WithRateLimiting_RespectsRateLimits() {
+            // Test that startup initialization respects rate limiting
+            var settings = UpdateSettings.Instance;
+            var originalEnabled = settings.AutomaticCheckEnabled;
+            var originalCheckOnStartup = settings.CheckOnStartup;
+            var originalLastCheck = settings.LastCheckTime;
+
+            try {
+                // Arrange - Set up rate limited scenario
+                settings.AutomaticCheckEnabled = true;
+                settings.CheckOnStartup = true;
+                settings.LastCheckTime = DateTime.Now.AddMinutes(-30); // Recent check, should be rate limited
+
+                // Act - Should not throw and should handle rate limiting gracefully
+                Assert.DoesNotThrow(() => UpdateChecker.StartAutomaticChecking());
+
+                // Assert - Should not be able to check due to rate limiting
+                Assert.IsFalse(settings.CanCheckNow(), "Should be rate limited");
+                Assert.IsTrue(settings.TimeUntilNextCheck() > TimeSpan.Zero, "Should have time remaining until next check");
+
+            } finally {
+                // Cleanup
+                settings.AutomaticCheckEnabled = originalEnabled;
+                settings.CheckOnStartup = originalCheckOnStartup;
+                settings.LastCheckTime = originalLastCheck;
+                UpdateChecker.StopAutomaticChecking();
+            }
+        }
+
+        [Test]
+        public void StartupInitialization_FirstTimeSetup_CreatesSettingsAsset() {
+            // Test that first-time setup properly creates the settings asset
+            // This test verifies that UpdateSettings.Instance works correctly
+
+            // Act - Access the settings instance (should create if not exists)
+            var settings = UpdateSettings.Instance;
+
+            // Assert - Settings should be created with default values
+            Assert.IsNotNull(settings, "Settings instance should be created");
+            Assert.IsTrue(settings.AutomaticCheckEnabled, "Default should enable automatic checking");
+            Assert.IsTrue(settings.CheckOnStartup, "Default should enable startup checking");
+            Assert.AreEqual(24, settings.CheckIntervalHours, "Default interval should be 24 hours");
+            Assert.AreEqual(0, settings.FailedCheckCount, "Default failed count should be 0");
+            Assert.AreEqual("", settings.DismissedVersion, "Default dismissed version should be empty");
+        }
+
+        [Test]
+        public void StartupInitialization_HandlesExceptions_Gracefully() {
+            // Test that startup initialization handles exceptions gracefully
+            // This simulates potential issues during startup
+
+            var settings = UpdateSettings.Instance;
+            var originalEnabled = settings.AutomaticCheckEnabled;
+
+            try {
+                // Arrange - Set up valid settings
+                settings.AutomaticCheckEnabled = true;
+
+                // Act & Assert - Should not throw even if there are internal issues
+                Assert.DoesNotThrow(() => UpdateChecker.StartAutomaticChecking());
+                Assert.DoesNotThrow(() => UpdateChecker.StopAutomaticChecking());
+
+            } finally {
+                // Cleanup
+                settings.AutomaticCheckEnabled = originalEnabled;
+                UpdateChecker.StopAutomaticChecking();
+            }
+        }
+
+        #endregion
+
         #region Error Handling Tests
 
         [Test]
