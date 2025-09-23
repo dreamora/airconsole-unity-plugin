@@ -85,9 +85,16 @@ namespace NDream.AirConsole.Editor {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField($"Current: v{currentVersion}", GUILayout.Width(120));
             EditorGUILayout.LabelField($"Available: v{latestVersion}", GUILayout.Width(120));
-            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
 
-            if (GUILayout.Button("View Release", GUILayout.Width(100))) {
+            EditorGUILayout.BeginHorizontal();
+            // Primary action: Update Now
+            if (GUILayout.Button("Update Now", GUILayout.Width(100))) {
+                UpdateChecker.DownloadAndInstallUpdate();
+            }
+
+            // Secondary action: View Release Notes
+            if (GUILayout.Button("Release Notes", GUILayout.Width(100))) {
                 UpdateChecker.OpenReleasePage();
             }
 
@@ -183,6 +190,135 @@ namespace NDream.AirConsole.Editor {
             EditorGUILayout.EndVertical();
         }
 
+        /// <summary>
+        /// Draws the update settings section with preferences and controls
+        /// </summary>
+        private void DrawUpdateSettingsSection() {
+            var settings = UpdateSettings.Instance;
+
+            EditorGUILayout.LabelField("Update Settings", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            // Automatic update checking toggle
+            var newAutomaticEnabled = EditorGUILayout.Toggle("Automatic Update Checking", settings.AutomaticCheckEnabled);
+            if (newAutomaticEnabled != settings.AutomaticCheckEnabled) {
+                settings.AutomaticCheckEnabled = newAutomaticEnabled;
+                // Restart automatic checking to apply new settings
+                UpdateChecker.RestartAutomaticChecking();
+            }
+
+            // Check interval setting (only show if automatic checking is enabled)
+            if (settings.AutomaticCheckEnabled) {
+                EditorGUI.indentLevel++;
+                var newInterval = EditorGUILayout.IntSlider("Check Interval (hours)", settings.CheckIntervalHours, 24, 168); // 24 hours to 1 week
+                if (newInterval != settings.CheckIntervalHours) {
+                    settings.CheckIntervalHours = newInterval;
+                }
+
+                // Check on startup toggle
+                var newCheckOnStartup = EditorGUILayout.Toggle("Check on Editor Startup", settings.CheckOnStartup);
+                if (newCheckOnStartup != settings.CheckOnStartup) {
+                    settings.CheckOnStartup = newCheckOnStartup;
+                }
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.Space(5);
+
+            // Manual check button - allow manual checks anytime (not rate limited)
+            EditorGUILayout.BeginHorizontal();
+
+            var isCheckInProgress = UpdateChecker.IsCheckInProgress;
+
+            GUI.enabled = !isCheckInProgress;
+            if (GUILayout.Button("Check Now", GUILayout.Width(100))) {
+                UpdateChecker.CheckForUpdatesAsync(force: true); // Force manual checks to bypass rate limiting
+                // Force UI refresh after a short delay to show results
+                EditorApplication.delayCall += () => {
+                    EditorApplication.delayCall += () => Repaint();
+                };
+            }
+            GUI.enabled = true;
+
+            // Show check status
+            if (isCheckInProgress) {
+                EditorGUILayout.LabelField("Checking for updates...", EditorStyles.miniLabel);
+            } else {
+                EditorGUILayout.LabelField("Manual check available anytime", EditorStyles.miniLabel);
+            }
+            EditorGUILayout.EndHorizontal();
+
+            // Manual check button - allow manual checks anytime (not rate limited)
+            EditorGUILayout.BeginHorizontal();
+            // Show dismissed updates button (only show if there are dismissed updates)
+            if (!UpdateChecker.IsUpdateAvailable && UpdateChecker.IsCurrentUpdateDismissed) {
+                if (GUILayout.Button("Show Dismissed Updates", GUILayout.Width(200))) {
+                    UpdateChecker.ClearDismissedVersion();
+                    Repaint();
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(5);
+
+            // Display last check time and next available check time
+            DrawUpdateTimingInfo();
+
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draws timing information for update checks
+        /// </summary>
+        private void DrawUpdateTimingInfo() {
+            var lastCheckTime = UpdateChecker.LastCheckTime;
+            var timeUntilNext = UpdateChecker.TimeUntilNextCheck();
+
+            EditorGUILayout.BeginVertical();
+
+            // Last check time
+            if (lastCheckTime != DateTime.MinValue) {
+                var timeSinceCheck = DateTime.Now - lastCheckTime;
+                string lastCheckText = FormatTimeSpan(timeSinceCheck);
+                EditorGUILayout.LabelField($"Last checked: {lastCheckText} ago", EditorStyles.miniLabel);
+            } else {
+                EditorGUILayout.LabelField("Last checked: Never", EditorStyles.miniLabel);
+            }
+
+            // Next automatic check time (only if automatic checking is enabled)
+            var settings = UpdateSettings.Instance;
+            if (settings.AutomaticCheckEnabled) {
+                if (timeUntilNext == TimeSpan.Zero) {
+                    EditorGUILayout.LabelField("Next automatic check: Available now", EditorStyles.miniLabel);
+                } else if (timeUntilNext != TimeSpan.MaxValue) {
+                    string nextCheckText = FormatTimeSpan(timeUntilNext);
+                    EditorGUILayout.LabelField($"Next automatic check: In {nextCheckText}", EditorStyles.miniLabel);
+                }
+            } else {
+                EditorGUILayout.LabelField("Next automatic check: Disabled", EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Formats a TimeSpan into a human-readable string
+        /// </summary>
+        /// <param name="timeSpan">The TimeSpan to format</param>
+        /// <returns>Formatted string</returns>
+        private string FormatTimeSpan(TimeSpan timeSpan) {
+            if (timeSpan.TotalDays >= 1) {
+                return $"{(int)timeSpan.TotalDays} day(s)";
+            } else if (timeSpan.TotalHours >= 1) {
+                return $"{(int)timeSpan.TotalHours} hour(s)";
+            } else if (timeSpan.TotalMinutes >= 1) {
+                return $"{(int)timeSpan.TotalMinutes} minute(s)";
+            } else {
+                return "less than a minute";
+            }
+        }
+
         private void OnGUI() {
             // show logo & version
             EditorGUILayout.BeginHorizontal(styleBlack, GUILayout.Height(30));
@@ -196,26 +332,10 @@ namespace NDream.AirConsole.Editor {
 
             GUILayout.Label("AirConsole Settings", EditorStyles.boldLabel);
 
-            // Manual update check button for testing
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Check for Updates", GUILayout.Width(150))) {
-                UpdateChecker.CheckForUpdatesAsync(force: true);
-            }
-            if (GUILayout.Button("Clear Dismissed", GUILayout.Width(120))) {
-                UpdateChecker.ClearDismissedVersion();
-            }
-            EditorGUILayout.EndHorizontal();
+            // Update Settings Section
+            DrawUpdateSettingsSection();
 
-            // Debug information
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("Debug Info:", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"Update Available: {UpdateChecker.IsUpdateAvailable}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"Check In Progress: {UpdateChecker.IsCheckInProgress}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"Can Check Now: {UpdateChecker.CanCheckNow()}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"Current Version: {UpdateChecker.CurrentVersion}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"Latest Version: {UpdateChecker.LatestVersion}", EditorStyles.miniLabel);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(10);
 
             Settings.webSocketPort = EditorGUILayout.IntField("Websocket Port", Settings.webSocketPort, GUILayout.MaxWidth(200));
             EditorPrefs.SetInt("webSocketPort", Settings.webSocketPort);
