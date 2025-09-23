@@ -1,3 +1,4 @@
+using System.Text;
 #if !DISABLE_AIRCONSOLE
 namespace NDream.AirConsole.Editor {
     using System;
@@ -16,46 +17,53 @@ namespace NDream.AirConsole.Editor {
         private static Version _lastNotifiedVersion;
 
         #region Public Properties
-
         /// <summary>
         /// Gets whether an update is currently available
         /// </summary>
-        public static bool IsUpdateAvailable => GithubUpdate.IsUpdateAvailable && !IsCurrentUpdateDismissed;
+        public static bool IsUpdateAvailable {
+            get => GithubUpdate.IsUpdateAvailable && !IsCurrentUpdateDismissed;
+        }
 
         /// <summary>
         /// Gets the latest available version from GitHub
         /// </summary>
-        public static Version LatestVersion => GithubUpdate.LatestVersion;
+        public static Version LatestVersion {
+            get => GithubUpdate.LatestVersion;
+        }
 
         /// <summary>
         /// Gets whether an update check is currently in progress
         /// </summary>
-        public static bool IsCheckInProgress => GithubUpdate.IsCheckInProgress;
+        public static bool IsCheckInProgress {
+            get => GithubUpdate.IsCheckInProgress;
+        }
 
         /// <summary>
         /// Gets the time of the last update check
         /// </summary>
-        public static DateTime LastCheckTime => GithubUpdate.LastCheckTime;
+        public static DateTime LastCheckTime {
+            get => GithubUpdate.LastCheckTime;
+        }
 
         /// <summary>
         /// Gets the current version of the plugin
         /// </summary>
-        public static Version CurrentVersion => GithubUpdate.GetCurrentVersion();
+        public static Version CurrentVersion {
+            get => GithubUpdate.GetCurrentVersion();
+        }
 
         /// <summary>
         /// Gets whether the current available update has been dismissed by the user
         /// </summary>
         public static bool IsCurrentUpdateDismissed {
             get {
-                var latestVersion = LatestVersion;
+                Version latestVersion = LatestVersion;
                 return latestVersion != null && GithubUpdate.IsVersionDismissed(latestVersion);
             }
         }
-
         #endregion
 
         #region Automatic Checking
-
         /// <summary>
         /// Starts the automatic update checking system.
         /// This should be called once during editor initialization.
@@ -66,7 +74,7 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             if (!settings.AutomaticCheckEnabled) {
                 AirConsoleLogger.Log(() => "UpdateChecker automatic checking disabled in settings");
                 return;
@@ -80,14 +88,15 @@ namespace NDream.AirConsole.Editor {
             }
 
             _automaticCheckingInitialized = true;
-            AirConsoleLogger.Log(() => $"UpdateChecker automatic checking system started (interval: {settings.CheckIntervalHours}h, failures: {settings.FailedCheckCount})");
+            AirConsoleLogger.Log(() =>
+                $"UpdateChecker automatic checking system started (interval: {settings.CheckIntervalHours}h, failures: {settings.FailedCheckCount})");
 
             // Check on startup if enabled - always allow first startup check to bypass rate limiting
             if (settings.CheckOnStartup) {
                 AirConsoleLogger.Log(() => "Scheduling startup update check (bypassing rate limiting for editor startup)");
                 EditorApplication.delayCall += () => {
                     // Force startup check to bypass rate limiting - this is the first check after editor startup
-                    CheckForUpdatesAsync(force: true);
+                    CheckForUpdatesAsync(true);
                 };
             } else {
                 AirConsoleLogger.Log(() => "Startup update check disabled in settings");
@@ -127,11 +136,9 @@ namespace NDream.AirConsole.Editor {
             StopAutomaticChecking();
             StartAutomaticChecking();
         }
-
         #endregion
 
         #region Manual Checking
-
         /// <summary>
         /// Manually triggers an update check.
         /// Respects rate limiting rules unless force is specified.
@@ -139,7 +146,7 @@ namespace NDream.AirConsole.Editor {
         /// <param name="force">If true, bypasses rate limiting (use with caution)</param>
         /// <returns>True if the check was started, false if rate limited or already in progress</returns>
         public static bool CheckForUpdatesAsync(bool force = false) {
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
 
             // Check if we should attempt recovery from error state
             if (!force && settings.ShouldAttemptRecovery()) {
@@ -149,7 +156,7 @@ namespace NDream.AirConsole.Editor {
 
             // Always respect rate limiting for manual checks unless explicitly forced
             if (!force && !settings.CanCheckNow()) {
-                var timeUntilNext = settings.TimeUntilNextCheck();
+                TimeSpan timeUntilNext = settings.TimeUntilNextCheck();
                 string rateLimitMessage = $"Update check rate limited. Next check available in {timeUntilNext:hh\\:mm\\:ss}";
 
                 // Add diagnostic info if there are previous errors
@@ -181,17 +188,13 @@ namespace NDream.AirConsole.Editor {
         /// Gets whether an update check can be performed now based on rate limiting
         /// </summary>
         /// <returns>True if a check can be performed now</returns>
-        public static bool CanCheckNow() {
-            return GithubUpdate.CanCheckNow();
-        }
+        public static bool CanCheckNow() => GithubUpdate.CanCheckNow();
 
         /// <summary>
         /// Gets the time until the next check is allowed
         /// </summary>
         /// <returns>TimeSpan until next check, or TimeSpan.Zero if check is allowed now</returns>
-        public static TimeSpan TimeUntilNextCheck() {
-            return GithubUpdate.TimeUntilNextCheck();
-        }
+        public static TimeSpan TimeUntilNextCheck() => GithubUpdate.TimeUntilNextCheck();
 
         /// <summary>
         /// Validates and enforces check interval constraints
@@ -210,7 +213,7 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <returns>The effective check interval in hours</returns>
         public static int GetEffectiveCheckInterval() {
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             return settings.CheckIntervalHours;
         }
 
@@ -219,7 +222,7 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <returns>True if automatic checking should be disabled</returns>
         public static bool ShouldDisableAutomaticChecking() {
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
 
             // Disable after 5 consecutive failures
             if (settings.FailedCheckCount >= 5) {
@@ -228,7 +231,7 @@ namespace NDream.AirConsole.Editor {
 
             // Disable if we've had network errors for more than 7 days
             if (settings.NetworkErrorDetected && settings.LastErrorTime != DateTime.MinValue) {
-                var timeSinceError = DateTime.Now - settings.LastErrorTime;
+                TimeSpan timeSinceError = DateTime.Now - settings.LastErrorTime;
                 if (timeSinceError.TotalDays > 7) {
                     return true;
                 }
@@ -242,8 +245,8 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <returns>Status information about the periodic checking system</returns>
         public static string GetPeriodicCheckingStatus() {
-            var settings = UpdateSettings.Instance;
-            var status = new System.Text.StringBuilder();
+            UpdateSettings settings = UpdateSettings.Instance;
+            StringBuilder status = new();
 
             status.AppendLine($"Automatic Checking: {(settings.AutomaticCheckEnabled ? "Enabled" : "Disabled")}");
             status.AppendLine($"System Initialized: {_automaticCheckingInitialized}");
@@ -251,11 +254,11 @@ namespace NDream.AirConsole.Editor {
             status.AppendLine($"Failed Check Count: {settings.FailedCheckCount}");
 
             if (settings.FailedCheckCount > 0) {
-                var effectiveInterval = GetEffectiveCheckInterval();
+                int effectiveInterval = GetEffectiveCheckInterval();
                 status.AppendLine($"Effective Interval (with backoff): {effectiveInterval} hours");
             }
 
-            var timeUntilNext = TimeUntilNextCheck();
+            TimeSpan timeUntilNext = TimeUntilNextCheck();
             if (timeUntilNext > TimeSpan.Zero) {
                 status.AppendLine($"Next Check Available In: {timeUntilNext:hh\\:mm\\:ss}");
             } else {
@@ -281,24 +284,21 @@ namespace NDream.AirConsole.Editor {
             StopAutomaticChecking();
 
             // Small delay to ensure cleanup is complete
-            EditorApplication.delayCall += () => {
-                StartAutomaticChecking();
-            };
+            EditorApplication.delayCall += () => { StartAutomaticChecking(); };
         }
-
         #endregion
 
         #region Dismiss Functionality
-
         /// <summary>
         /// Dismisses the current available update so it won't show notifications.
         /// The update will reappear if a newer version becomes available.
         /// </summary>
         public static void DismissCurrentUpdate() {
-            var latestVersion = LatestVersion;
+            Version latestVersion = LatestVersion;
             if (latestVersion != null) {
                 GithubUpdate.DismissVersion(latestVersion);
-                AirConsoleLogger.Log(() => $"Update v{latestVersion} dismissed. Notifications will not show until a newer version is available.");
+                AirConsoleLogger.Log(() =>
+                    $"Update v{latestVersion} dismissed. Notifications will not show until a newer version is available.");
 
                 // Reset notification state since user dismissed this version
                 _lastUpdateAvailableState = false;
@@ -332,7 +332,7 @@ namespace NDream.AirConsole.Editor {
         /// Resets the error state and re-enables automatic checking
         /// </summary>
         public static void ResetErrorState() {
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             settings.ResetFailedCheckCount();
 
             if (!settings.AutomaticCheckEnabled) {
@@ -351,22 +351,23 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <returns>Formatted diagnostic string</returns>
         public static string GetDiagnosticInfo() {
-            var settings = UpdateSettings.Instance;
-            var info = new System.Text.StringBuilder();
+            UpdateSettings settings = UpdateSettings.Instance;
+            StringBuilder info = new();
 
             info.AppendLine($"Update Available: {IsUpdateAvailable}");
             info.AppendLine($"Check In Progress: {IsCheckInProgress}");
             info.AppendLine($"Automatic Checking: {settings.AutomaticCheckEnabled}");
-            info.AppendLine($"Last Check: {(LastCheckTime == DateTime.MinValue ? "Never" : LastCheckTime.ToString("yyyy-MM-dd HH:mm:ss"))}");
+            info.AppendLine(
+                $"Last Check: {(LastCheckTime == DateTime.MinValue ? "Never" : LastCheckTime.ToString("yyyy-MM-dd HH:mm:ss"))}");
             info.AppendLine($"Current Version: {CurrentVersion}");
-            info.AppendLine($"Latest Version: {(LatestVersion?.ToString() ?? "Unknown")}");
+            info.AppendLine($"Latest Version: {LatestVersion?.ToString() ?? "Unknown"}");
             info.AppendLine($"Failed Check Count: {settings.FailedCheckCount}");
 
             if (settings.FailedCheckCount > 0) {
                 info.AppendLine($"Error Details: {settings.GetDiagnosticInfo()}");
             }
 
-            var timeUntilNext = TimeUntilNextCheck();
+            TimeSpan timeUntilNext = TimeUntilNextCheck();
             if (timeUntilNext > TimeSpan.Zero) {
                 info.AppendLine($"Next Check Available: {timeUntilNext:hh\\:mm\\:ss}");
             } else {
@@ -381,14 +382,10 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <param name="version">Version to check</param>
         /// <returns>True if the version is dismissed</returns>
-        public static bool IsVersionDismissed(Version version) {
-            return GithubUpdate.IsVersionDismissed(version);
-        }
-
+        public static bool IsVersionDismissed(Version version) => GithubUpdate.IsVersionDismissed(version);
         #endregion
 
         #region Update Installation
-
         /// <summary>
         /// Downloads and installs the latest plugin update from GitHub.
         /// Shows progress dialog and confirmation prompts to the user.
@@ -438,11 +435,9 @@ namespace NDream.AirConsole.Editor {
             // Otherwise fall back to the general releases page
             OpenReleasePage();
         }
-
         #endregion
 
         #region Private Implementation
-
         /// <summary>
         /// Handles periodic checking logic with intelligent scheduling
         /// </summary>
@@ -451,7 +446,7 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
 
             // Stop if automatic checking is disabled
             if (!settings.AutomaticCheckEnabled) {
@@ -462,8 +457,8 @@ namespace NDream.AirConsole.Editor {
 
             // Disable automatic checking after persistent failures (5+ consecutive failures)
             if (settings.FailedCheckCount >= 5) {
-                AirConsoleLogger.LogWarning(() => $"Disabling automatic checking after {settings.FailedCheckCount} consecutive failures. Use 'Reset Error State' to re-enable.");
-                settings.AutomaticCheckEnabled = false;
+                AirConsoleLogger.LogWarning(() =>
+                    $"Disabling automatic checking after {settings.FailedCheckCount} consecutive failures. Use 'Reset Error State' to re-enable.");
                 StopAutomaticChecking();
                 return;
             }
@@ -500,7 +495,7 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         /// <returns>True if a periodic check should be performed</returns>
         private static bool ShouldPerformPeriodicCheck() {
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
 
             // Basic rate limiting check
             if (!settings.CanCheckNow()) {
@@ -509,8 +504,8 @@ namespace NDream.AirConsole.Editor {
 
             // Don't check too frequently if we've had recent failures
             if (settings.FailedCheckCount > 0) {
-                var timeSinceLastError = DateTime.Now - settings.LastErrorTime;
-                var minimumWaitTime = TimeSpan.FromHours(Math.Min(24, Math.Pow(2, settings.FailedCheckCount)));
+                TimeSpan timeSinceLastError = DateTime.Now - settings.LastErrorTime;
+                TimeSpan minimumWaitTime = TimeSpan.FromHours(Math.Min(24, Math.Pow(2, settings.FailedCheckCount)));
 
                 if (timeSinceLastError < minimumWaitTime) {
                     return false;
@@ -518,16 +513,16 @@ namespace NDream.AirConsole.Editor {
             }
 
             // Check if we're in a reasonable time window (avoid checking during likely inactive periods)
-            var now = DateTime.Now;
-            var hourOfDay = now.Hour;
+            DateTime now = DateTime.Now;
+            int hourOfDay = now.Hour;
 
             // Prefer checking during typical working hours (8 AM to 8 PM) but don't be too restrictive
             // This is just a preference, not a hard requirement
-            var isPreferredTime = hourOfDay >= 8 && hourOfDay <= 20;
+            bool isPreferredTime = hourOfDay >= 8 && hourOfDay <= 20;
 
             // If it's been more than 48 hours since last check, check regardless of time
-            var timeSinceLastCheck = now - settings.LastCheckTime;
-            var isOverdue = timeSinceLastCheck.TotalHours > 48;
+            TimeSpan timeSinceLastCheck = now - settings.LastCheckTime;
+            bool isOverdue = timeSinceLastCheck.TotalHours > 48;
 
             return isPreferredTime || isOverdue;
         }
@@ -536,26 +531,23 @@ namespace NDream.AirConsole.Editor {
         /// Checks for changes in update availability and handles notifications
         /// </summary>
         private static void CheckForUpdateStatusChanges() {
-            var currentUpdateAvailable = IsUpdateAvailable;
-            var currentLatestVersion = LatestVersion;
-            var settings = UpdateSettings.Instance;
+            bool currentUpdateAvailable = IsUpdateAvailable;
+            Version currentLatestVersion = LatestVersion;
+            UpdateSettings settings = UpdateSettings.Instance;
 
             // Check if update status changed from false to true (new update detected)
             if (!_lastUpdateAvailableState && currentUpdateAvailable) {
                 // Check if this is a new version we haven't notified about yet
-                if (currentLatestVersion != null &&
-                    (_lastNotifiedVersion == null || currentLatestVersion > _lastNotifiedVersion)) {
-
+                if (currentLatestVersion != null && (_lastNotifiedVersion == null || currentLatestVersion > _lastNotifiedVersion)) {
                     AirConsoleLogger.Log(() => $"New update detected: v{currentLatestVersion}.");
 
                     // Auto-open update checker window if enabled
                     if (settings.AutoOpenSettingsWindow) {
                         AirConsoleLogger.Log(() => "Auto-opening AirConsole Update Checker window to show update notification.");
-                        EditorApplication.delayCall += () => {
-                            UpdateCheckerWindow.ShowWindow();
-                        };
+                        EditorApplication.delayCall += () => { UpdateCheckerWindow.ShowWindow(); };
                     } else {
-                        AirConsoleLogger.Log(() => "Auto-open update checker window is disabled. Update notification available in AirConsole Update Checker.");
+                        AirConsoleLogger.Log(() =>
+                            "Auto-open update checker window is disabled. Update notification available in AirConsole Update Checker.");
                     }
 
                     // Remember this version so we don't repeatedly open the window
@@ -566,11 +558,9 @@ namespace NDream.AirConsole.Editor {
             // Update the last known state
             _lastUpdateAvailableState = currentUpdateAvailable;
         }
-
         #endregion
 
         #region Editor Initialization
-
         /// <summary>
         /// Initialize the update checker when the editor starts
         /// </summary>
@@ -580,10 +570,11 @@ namespace NDream.AirConsole.Editor {
             EditorApplication.delayCall += () => {
                 try {
                     // Initialize UpdateSettings first to ensure asset creation
-                    var settings = UpdateSettings.Instance;
+                    UpdateSettings settings = UpdateSettings.Instance;
 
                     // Log startup initialization for debugging
-                    AirConsoleLogger.Log(() => $"UpdateChecker initializing on editor startup. AutoCheck: {settings.AutomaticCheckEnabled}, CheckOnStartup: {settings.CheckOnStartup}");
+                    AirConsoleLogger.Log(() =>
+                        $"UpdateChecker initializing on editor startup. AutoCheck: {settings.AutomaticCheckEnabled}, CheckOnStartup: {settings.CheckOnStartup}");
 
                     // Start automatic checking system
                     StartAutomaticChecking();
@@ -632,7 +623,6 @@ namespace NDream.AirConsole.Editor {
                 AirConsoleLogger.LogError(() => $"Error during UpdateChecker shutdown: {ex.Message}");
             }
         }
-
         #endregion
     }
 }

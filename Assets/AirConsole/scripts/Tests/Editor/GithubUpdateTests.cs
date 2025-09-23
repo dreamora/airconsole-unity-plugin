@@ -61,7 +61,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void IsVersionDismissed_WithDismissedVersion_ReturnsTrue() {
             // Arrange
-            Version version = new Version(1, 2, 3);
+            Version version = new(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
             string originalDismissedVersion = settings.DismissedVersion;
             settings.DismissedVersion = version.ToString();
@@ -81,7 +81,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void IsVersionDismissed_WithNonDismissedVersion_ReturnsFalse() {
             // Arrange
-            Version version = new Version(1, 2, 3);
+            Version version = new(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
             string originalDismissedVersion = settings.DismissedVersion;
             settings.DismissedVersion = "2.0.0";
@@ -101,7 +101,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void DismissVersion_WithValidVersion_SetsDismissedVersion() {
             // Arrange
-            Version version = new Version(1, 2, 3);
+            Version version = new(1, 2, 3);
             UpdateSettings settings = UpdateSettings.Instance;
             string originalDismissedVersion = settings.DismissedVersion;
 
@@ -258,9 +258,11 @@ namespace NDream.AirConsole.Editor.Tests {
 
             // LatestVersion can be null if no check has been performed
             Version latestVersion = GithubUpdate.LatestVersion;
+
             // Just verify it doesn't throw
 
             DateTime lastCheckTime = GithubUpdate.LastCheckTime;
+
             // Verify it's a valid DateTime (can be DateTime.MinValue)
             Assert.IsTrue(lastCheckTime >= DateTime.MinValue);
         }

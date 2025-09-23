@@ -9,7 +9,6 @@ namespace NDream.AirConsole.Editor.Tests {
     /// Integration tests for comprehensive error handling and logging
     /// </summary>
     public class ErrorHandlingIntegrationTests {
-
         [Test]
         public void UpdateChecker_GetDiagnosticInfo_ReturnsValidInformation() {
             // Act
@@ -26,7 +25,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void UpdateChecker_ResetErrorState_ClearsErrorsAndReenablesChecking() {
             // Arrange - simulate some failures
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             settings.IncrementFailedCheckCount("Test error", true);
             settings.AutomaticCheckEnabled = false;
 
@@ -42,21 +41,21 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void UpdateSettings_ExponentialBackoff_IncreasesIntervalWithFailures() {
             // Arrange
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             settings.ResetFailedCheckCount();
-            settings.LastCheckTime = DateTime.Now.AddHours(-25); // Ensure we can check initially
+            settings.LastCheckTime = DateTime.Now.AddHours(-13); // Ensure we can check initially
 
             // Act & Assert - Test exponential backoff
-            var initialInterval = settings.TimeUntilNextCheck();
+            TimeSpan initialInterval = settings.TimeUntilNextCheck();
 
             settings.IncrementFailedCheckCount("Error 1");
-            var interval1 = settings.TimeUntilNextCheck();
+            TimeSpan interval1 = settings.TimeUntilNextCheck();
 
             settings.IncrementFailedCheckCount("Error 2");
-            var interval2 = settings.TimeUntilNextCheck();
+            TimeSpan interval2 = settings.TimeUntilNextCheck();
 
             settings.IncrementFailedCheckCount("Error 3");
-            var interval3 = settings.TimeUntilNextCheck();
+            TimeSpan interval3 = settings.TimeUntilNextCheck();
 
             // Verify exponential backoff is working
             Assert.IsTrue(interval1 >= initialInterval, "First failure should maintain or increase interval");
@@ -67,7 +66,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void UpdateSettings_NetworkErrorDetection_PersistsAcrossFailures() {
             // Arrange
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             settings.ResetFailedCheckCount();
 
             // Act - Simulate network errors
@@ -85,7 +84,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void UpdateSettings_RecoveryLogic_WorksAfterTimeDelay() {
             // Arrange
-            var settings = UpdateSettings.Instance;
+            UpdateSettings settings = UpdateSettings.Instance;
             settings.ResetFailedCheckCount();
 
             // Simulate a network error

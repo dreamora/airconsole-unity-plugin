@@ -10,11 +10,10 @@ namespace NDream.AirConsole.Editor.Tests {
     /// UI Polish: Enhanced tests for styling, responsiveness, and user experience
     /// </summary>
     public class SettingWindowUITests {
-
         [Test]
         public void SettingWindow_CanBeCreated() {
             // Test that the SettingWindow can be instantiated without errors
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
             Assert.IsNotNull(window);
             window.Close();
         }
@@ -22,12 +21,13 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void UpdateNotificationBanner_HandlesNullVersions() {
             // Test that the UI methods handle null versions gracefully
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             // This should not throw exceptions even if UpdateChecker returns null versions
             try {
                 // Force a repaint to trigger OnGUI
                 window.Repaint();
+
                 // If we get here without exception, test passes
             } catch (Exception ex) {
                 Assert.Fail($"UI should handle null versions gracefully: {ex.Message}");
@@ -40,13 +40,13 @@ namespace NDream.AirConsole.Editor.Tests {
         public void UpdateChecker_PropertiesAreAccessible() {
             // Test that all UpdateChecker properties used in the UI are accessible
             try {
-                var isUpdateAvailable = UpdateChecker.IsUpdateAvailable;
-                var isCheckInProgress = UpdateChecker.IsCheckInProgress;
-                var canCheckNow = UpdateChecker.CanCheckNow();
-                var currentVersion = UpdateChecker.CurrentVersion;
-                var latestVersion = UpdateChecker.LatestVersion;
-                var lastCheckTime = UpdateChecker.LastCheckTime;
-                var timeUntilNext = UpdateChecker.TimeUntilNextCheck();
+                bool isUpdateAvailable = UpdateChecker.IsUpdateAvailable;
+                bool isCheckInProgress = UpdateChecker.IsCheckInProgress;
+                bool canCheckNow = UpdateChecker.CanCheckNow();
+                Version currentVersion = UpdateChecker.CurrentVersion;
+                Version latestVersion = UpdateChecker.LatestVersion;
+                DateTime lastCheckTime = UpdateChecker.LastCheckTime;
+                TimeSpan timeUntilNext = UpdateChecker.TimeUntilNextCheck();
 
                 // These calls should not throw exceptions - if we get here, test passes
                 Assert.IsTrue(true); // Explicit pass
@@ -73,7 +73,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_RespondsToWindowSizeChanges() {
             // UI Polish: Test responsive layout behavior
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Test different window sizes
@@ -98,7 +98,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_MinimumSizeIsSet() {
             // UI Polish: Test that minimum window size is enforced
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Check that minimum size is set
@@ -114,7 +114,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_CustomStylesInitialize() {
             // UI Polish: Test that custom styles are properly initialized
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Trigger OnGUI to initialize styles
@@ -132,12 +132,13 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_AnimationSystemWorks() {
             // UI Polish: Test that animation system doesn't cause errors
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Trigger multiple repaints to test animation system
                 for (int i = 0; i < 5; i++) {
                     window.Repaint();
+
                     // Small delay to simulate time passing
                     System.Threading.Thread.Sleep(10);
                 }
@@ -154,7 +155,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_TooltipsAreConfigured() {
             // UI Polish: Test that tooltips are properly configured
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // This test verifies that the UI can be rendered with tooltips
@@ -173,7 +174,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_ScrollingWorks() {
             // UI Polish: Test that scrolling functionality works
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Set a small window size to force scrolling
@@ -192,7 +193,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void SettingWindow_CollapsibleSectionsWork() {
             // UI Polish: Test that collapsible sections function properly
-            var window = EditorWindow.GetWindow<SettingWindow>();
+            SettingWindow window = EditorWindow.GetWindow<SettingWindow>();
 
             try {
                 // Trigger OnGUI multiple times to test foldout behavior

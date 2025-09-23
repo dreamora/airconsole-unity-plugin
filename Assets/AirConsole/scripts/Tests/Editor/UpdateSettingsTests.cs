@@ -28,7 +28,7 @@ namespace NDream.AirConsole.Editor.Tests {
         public void DefaultValues_AreSetCorrectly() {
             // Test requirement 4.1: Default settings should be reasonable
             Assert.IsTrue(settings.AutomaticCheckEnabled, "Automatic checking should be enabled by default");
-            Assert.AreEqual(24, settings.CheckIntervalHours, "Default check interval should be 24 hours");
+            Assert.AreEqual(12, settings.CheckIntervalHours, "Default check interval should be 12 hours");
             Assert.IsTrue(settings.CheckOnStartup, "Check on startup should be enabled by default");
             Assert.AreEqual("", settings.DismissedVersion, "Dismissed version should be empty by default");
             Assert.AreEqual(0, settings.FailedCheckCount, "Failed check count should be 0 by default");
@@ -36,23 +36,10 @@ namespace NDream.AirConsole.Editor.Tests {
         }
 
         [Test]
-        public void CheckIntervalHours_EnforcesMinimum24Hours() {
-            // Test requirement 4.2: Minimum 24-hour interval validation
-            settings.CheckIntervalHours = 12;
-            Assert.AreEqual(24, settings.CheckIntervalHours, "Check interval should be clamped to minimum 24 hours");
-
-            settings.CheckIntervalHours = 1;
-            Assert.AreEqual(24, settings.CheckIntervalHours, "Check interval should be clamped to minimum 24 hours");
-
-            settings.CheckIntervalHours = 48;
-            Assert.AreEqual(48, settings.CheckIntervalHours, "Check interval should accept values >= 24 hours");
-        }
-
-        [Test]
         public void CanCheckNow_ReturnsFalse_WhenAutomaticCheckDisabled() {
             // Test requirement 4.4: Disabled automatic checking
             settings.AutomaticCheckEnabled = false;
-            settings.LastCheckTime = DateTime.Now.AddHours(-25); // More than 24 hours ago
+            settings.LastCheckTime = DateTime.Now.AddHours(-13); // More than 12 hours ago
 
             Assert.IsFalse(settings.CanCheckNow(), "Should not be able to check when automatic checking is disabled");
         }
@@ -61,18 +48,18 @@ namespace NDream.AirConsole.Editor.Tests {
         public void CanCheckNow_ReturnsTrue_WhenEnoughTimeHasPassed() {
             // Test requirement 4.2: Time-based rate limiting
             settings.AutomaticCheckEnabled = true;
-            settings.LastCheckTime = DateTime.Now.AddHours(-25); // 25 hours ago (> 24 hour minimum)
+            settings.LastCheckTime = DateTime.Now.AddHours(-13); // 13 hours ago (> 12 hour minimum)
 
-            Assert.IsTrue(settings.CanCheckNow(), "Should be able to check when more than 24 hours have passed");
+            Assert.IsTrue(settings.CanCheckNow(), "Should be able to check when more than 12 hours have passed");
         }
 
         [Test]
         public void CanCheckNow_ReturnsFalse_WhenNotEnoughTimeHasPassed() {
             // Test requirement 4.2: Time-based rate limiting
             settings.AutomaticCheckEnabled = true;
-            settings.LastCheckTime = DateTime.Now.AddHours(-12); // 12 hours ago (< 24 hour minimum)
+            settings.LastCheckTime = DateTime.Now.AddHours(-6); // 6 hours ago (< 12 hour minimum)
 
-            Assert.IsFalse(settings.CanCheckNow(), "Should not be able to check when less than 24 hours have passed");
+            Assert.IsFalse(settings.CanCheckNow(), "Should not be able to check when less than 12 hours have passed");
         }
 
         [Test]
@@ -88,7 +75,7 @@ namespace NDream.AirConsole.Editor.Tests {
         public void TimeUntilNextCheck_ReturnsZero_WhenCheckAllowed() {
             // Test requirement 4.3: Time constraint helpers
             settings.AutomaticCheckEnabled = true;
-            settings.LastCheckTime = DateTime.Now.AddHours(-25); // 25 hours ago
+            settings.LastCheckTime = DateTime.Now.AddHours(-13); // 13 hours ago
 
             Assert.AreEqual(TimeSpan.Zero, settings.TimeUntilNextCheck(), "Should return zero when check is allowed");
         }
@@ -97,11 +84,11 @@ namespace NDream.AirConsole.Editor.Tests {
         public void TimeUntilNextCheck_ReturnsCorrectTime_WhenCheckNotAllowed() {
             // Test requirement 4.3: Time constraint helpers
             settings.AutomaticCheckEnabled = true;
-            settings.LastCheckTime = DateTime.Now.AddHours(-12); // 12 hours ago
+            settings.LastCheckTime = DateTime.Now.AddHours(-1); // 1 hour ago (need to wait 11 more hours)
 
-            var timeUntilNext = settings.TimeUntilNextCheck();
-            Assert.IsTrue(timeUntilNext.TotalHours > 11 && timeUntilNext.TotalHours < 13,
-                $"Should return approximately 12 hours, got {timeUntilNext.TotalHours}");
+            TimeSpan timeUntilNext = settings.TimeUntilNextCheck();
+            Assert.IsTrue(timeUntilNext.TotalHours > 10 && timeUntilNext.TotalHours < 12,
+                $"Should return approximately 11 hours, got {timeUntilNext.TotalHours}");
         }
 
         [Test]
@@ -111,29 +98,6 @@ namespace NDream.AirConsole.Editor.Tests {
 
             Assert.AreEqual(TimeSpan.MaxValue, settings.TimeUntilNextCheck(),
                 "Should return MaxValue when automatic checking is disabled");
-        }
-
-        [Test]
-        public void ExponentialBackoff_IncreasesInterval_OnFailures() {
-            // Test requirement 4.2: Rate limiting with exponential backoff
-            settings.AutomaticCheckEnabled = true;
-            settings.LastCheckTime = DateTime.Now.AddHours(-25); // 25 hours ago
-
-            // No failures - should be able to check
-            settings.ResetFailedCheckCount();
-            Assert.IsTrue(settings.CanCheckNow(), "Should be able to check with no failures");
-
-            // 1 failure - still 24 hour interval, should be able to check
-            settings.IncrementFailedCheckCount();
-            Assert.IsTrue(settings.CanCheckNow(), "Should be able to check with 1 failure after 25 hours");
-
-            // 2 failures - 48 hour interval, should not be able to check after only 25 hours
-            settings.IncrementFailedCheckCount();
-            Assert.IsFalse(settings.CanCheckNow(), "Should not be able to check with 2 failures after only 25 hours");
-
-            // But should be able to check after 49 hours
-            settings.LastCheckTime = DateTime.Now.AddHours(-49);
-            Assert.IsTrue(settings.CanCheckNow(), "Should be able to check with 2 failures after 49 hours");
         }
 
         [Test]
@@ -178,7 +142,7 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void LastCheckTime_CanBeSetAndRetrieved() {
             // Test requirement 4.5: Settings persistence
-            var testTime = new DateTime(2023, 12, 25, 10, 30, 0);
+            DateTime testTime = new(2023, 12, 25, 10, 30, 0);
             settings.LastCheckTime = testTime;
 
             Assert.AreEqual(testTime, settings.LastCheckTime, "Should store and retrieve last check time accurately");
@@ -189,13 +153,9 @@ namespace NDream.AirConsole.Editor.Tests {
             // Test that property setters mark the object as dirty (can't directly test EditorUtility.SetDirty in tests)
             // This is more of a behavioral test to ensure the setters are called
 
-            var originalEnabled = settings.AutomaticCheckEnabled;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
             settings.AutomaticCheckEnabled = !originalEnabled;
             Assert.AreNotEqual(originalEnabled, settings.AutomaticCheckEnabled, "AutomaticCheckEnabled should change");
-
-            var originalInterval = settings.CheckIntervalHours;
-            settings.CheckIntervalHours = originalInterval + 24;
-            Assert.AreNotEqual(originalInterval, settings.CheckIntervalHours, "CheckIntervalHours should change");
         }
     }
 }

@@ -9,7 +9,6 @@ namespace NDream.AirConsole.Editor.Tests {
     /// Comprehensive tests for button layout consistency and container structure in SettingWindow
     /// </summary>
     public class ButtonLayoutTests {
-
         private SettingWindow _testWindow;
 
         [SetUp]
@@ -134,6 +133,7 @@ namespace NDream.AirConsole.Editor.Tests {
                 // Multiple rapid repaints to test animation stability
                 for (int i = 0; i < 10; i++) {
                     _testWindow.Repaint();
+
                     // Small delay to simulate time passing
                     System.Threading.Thread.Sleep(5);
                 }
@@ -175,13 +175,13 @@ namespace NDream.AirConsole.Editor.Tests {
             // Test that UpdateChecker integration doesn't break layout
             try {
                 // Access UpdateChecker properties that are used in UI
-                var isUpdateAvailable = UpdateChecker.IsUpdateAvailable;
-                var isCheckInProgress = UpdateChecker.IsCheckInProgress;
-                var canCheckNow = UpdateChecker.CanCheckNow();
-                var currentVersion = UpdateChecker.CurrentVersion;
-                var latestVersion = UpdateChecker.LatestVersion;
-                var lastCheckTime = UpdateChecker.LastCheckTime;
-                var timeUntilNext = UpdateChecker.TimeUntilNextCheck();
+                bool isUpdateAvailable = UpdateChecker.IsUpdateAvailable;
+                bool isCheckInProgress = UpdateChecker.IsCheckInProgress;
+                bool canCheckNow = UpdateChecker.CanCheckNow();
+                Version currentVersion = UpdateChecker.CurrentVersion;
+                Version latestVersion = UpdateChecker.LatestVersion;
+                DateTime lastCheckTime = UpdateChecker.LastCheckTime;
+                TimeSpan timeUntilNext = UpdateChecker.TimeUntilNextCheck();
 
                 // Render UI with UpdateChecker data
                 _testWindow.Repaint();
@@ -196,7 +196,7 @@ namespace NDream.AirConsole.Editor.Tests {
         public void SettingWindow_UpdateSettingsIntegration() {
             // Test that UpdateSettings integration doesn't break layout
             try {
-                var settings = UpdateSettings.Instance;
+                UpdateSettings settings = UpdateSettings.Instance;
                 Assert.IsNotNull(settings, "UpdateSettings should be accessible");
 
                 // Render UI with settings
@@ -282,19 +282,18 @@ namespace NDream.AirConsole.Editor.Tests {
             try {
                 _testWindow.position = new Rect(100, 100, 500, 400);
 
-                var startTime = System.DateTime.Now;
+                DateTime startTime = DateTime.Now;
 
                 // Perform many repaints
                 for (int i = 0; i < 50; i++) {
                     _testWindow.Repaint();
                 }
 
-                var endTime = System.DateTime.Now;
-                var duration = endTime - startTime;
+                DateTime endTime = DateTime.Now;
+                TimeSpan duration = endTime - startTime;
 
                 // Should complete within reasonable time (5 seconds is very generous)
                 Assert.IsTrue(duration.TotalSeconds < 5, "UI should render efficiently");
-
             } catch (Exception ex) {
                 Assert.Fail($"Performance test failed: {ex.Message}");
             }

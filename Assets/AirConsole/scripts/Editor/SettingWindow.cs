@@ -291,9 +291,6 @@ namespace NDream.AirConsole.Editor {
                 // Also reset update settings
                 var updateSettings = UpdateSettings.Instance;
                 updateSettings.AutomaticCheckEnabled = true;
-                updateSettings.CheckIntervalHours = 24;
-                updateSettings.CheckOnStartup = true;
-                updateSettings.AutoOpenSettingsWindow = true;
                 updateSettings.DismissedVersion = "";
 
                 // Restart update checking with new settings

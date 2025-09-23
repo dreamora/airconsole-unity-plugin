@@ -9,7 +9,6 @@ namespace NDream.AirConsole.Editor.Tests {
     /// Simple test to verify exponential backoff math
     /// </summary>
     public class ExponentialBackoffTest {
-
         [Test]
         public void ExponentialBackoff_Math_WorksCorrectly() {
             // Test the exponential backoff formula: 1 << (FailedCheckCount - 1)

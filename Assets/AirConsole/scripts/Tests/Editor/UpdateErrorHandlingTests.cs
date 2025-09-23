@@ -77,7 +77,7 @@ namespace NDream.AirConsole.Editor.Tests {
             _testSettings.IncrementFailedCheckCount("Network error", true);
 
             // Simulate 24 hours passing by setting the error time to 25 hours ago
-            var twentyFiveHoursAgo = DateTime.Now.AddHours(-25);
+            DateTime twentyFiveHoursAgo = DateTime.Now.AddHours(-25);
             _testSettings.LastErrorTime = twentyFiveHoursAgo;
 
             // Act
@@ -115,19 +115,21 @@ namespace NDream.AirConsole.Editor.Tests {
 
             // Start with 1 failure (multiplier 1 = 24h)
             _testSettings.FailedCheckCount = 1;
-            var interval1 = _testSettings.TimeUntilNextCheck();
+            TimeSpan interval1 = _testSettings.TimeUntilNextCheck();
 
             // 2 failures (multiplier 2 = 48h)
             _testSettings.FailedCheckCount = 2;
-            var interval2 = _testSettings.TimeUntilNextCheck();
+            TimeSpan interval2 = _testSettings.TimeUntilNextCheck();
 
             // 3 failures (multiplier 4 = 96h)
             _testSettings.FailedCheckCount = 3;
-            var interval3 = _testSettings.TimeUntilNextCheck();
+            TimeSpan interval3 = _testSettings.TimeUntilNextCheck();
 
             // Verify exponential backoff is working - each should be roughly double the previous
-            Assert.IsTrue(interval2 > interval1, $"2 failures should have longer interval than 1: {interval1.TotalHours}h -> {interval2.TotalHours}h");
-            Assert.IsTrue(interval3 > interval2, $"3 failures should have longer interval than 2: {interval2.TotalHours}h -> {interval3.TotalHours}h");
+            Assert.IsTrue(interval2 > interval1,
+                $"2 failures should have longer interval than 1: {interval1.TotalHours}h -> {interval2.TotalHours}h");
+            Assert.IsTrue(interval3 > interval2,
+                $"3 failures should have longer interval than 2: {interval2.TotalHours}h -> {interval3.TotalHours}h");
 
             // Verify the approximate ratios (allowing for small timing differences)
             double ratio2to1 = interval2.TotalHours / interval1.TotalHours;

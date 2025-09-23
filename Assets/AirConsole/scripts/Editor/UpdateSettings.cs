@@ -3,35 +3,45 @@ namespace NDream.AirConsole.Editor {
     using System;
     using UnityEngine;
     using UnityEditor;
+
     /// <summary>
     /// ScriptableObject for persisting update checker settings and state
     /// </summary>
     [CreateAssetMenu(fileName = "UpdateSettings", menuName = "AirConsole/Update Settings")]
     public class UpdateSettings : ScriptableObject {
-        private const int FIXED_CHECK_INTERVAL_HOURS = 12;
-        private const string SETTINGS_ASSET_PATH = "Assets/AirConsole/resources/UpdateSettings.asset";
+        private const string SettingsAssetPath = "Assets/AirConsole/resources/UpdateSettings.asset";
 
-        [SerializeField] private bool automaticCheckEnabled = true;
-        [SerializeField] private int checkIntervalHours = 12; // Fixed 12-hour interval
-        [SerializeField] private string lastCheckTime = ""; // DateTime serialized as string
-        [SerializeField] private string dismissedVersion = "";
-        [SerializeField] private bool checkOnStartup = true;
-        [SerializeField] private bool autoOpenSettingsWindow = true; // Auto-open update checker window when update is available
-        [SerializeField] private int failedCheckCount = 0; // Track consecutive failures for backoff
-        [SerializeField] private string lastErrorMessage = ""; // Last error message for debugging
-        [SerializeField] private string lastErrorTime = ""; // When the last error occurred
-        [SerializeField] private bool networkErrorDetected = false; // Flag for persistent network issues
+        
+        [SerializeField]
+        private bool automaticCheckEnabled = true;
+        
+        [SerializeField]
+        private string lastCheckTime = ""; // DateTime serialized as string
+
+        [SerializeField]
+        private string dismissedVersion = "";
+        
+        [SerializeField]
+        private int failedCheckCount = 0; // Track consecutive failures for backoff
+
+        [SerializeField]
+        private string lastErrorMessage = ""; // Last error message for debugging
+
+        [SerializeField]
+        private string lastErrorTime = ""; // When the last error occurred
+
+        [SerializeField]
+        private bool networkErrorDetected = false; // Flag for persistent network issues
 
         private static UpdateSettings _instance;
 
         /// <summary>
-        /// Gets whether automatic update checking is enabled (always true)
+        /// Gets or sets whether automatic update checking is enabled
         /// </summary>
         public bool AutomaticCheckEnabled {
-            get => true; // Always enabled
+            get => automaticCheckEnabled;
             set {
-                // Ignore attempts to disable - always keep enabled
-                automaticCheckEnabled = true;
+                automaticCheckEnabled = value;
                 MarkDirty();
             }
         }
@@ -41,18 +51,13 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         public int CheckIntervalHours {
             get => 12; // Fixed 12-hour interval
-            set {
-                // Ignore attempts to change - always use 12 hours
-                checkIntervalHours = 12;
-                MarkDirty();
-            }
         }
 
         /// <summary>
         /// Gets or sets the last check time
         /// </summary>
         public DateTime LastCheckTime {
-            get => DateTime.TryParse(lastCheckTime, out var dt) ? dt : DateTime.MinValue;
+            get => DateTime.TryParse(lastCheckTime, out DateTime dt) ? dt : DateTime.MinValue;
             set {
                 lastCheckTime = value.ToString("O"); // ISO 8601 format
                 MarkDirty();
@@ -75,11 +80,6 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         public bool CheckOnStartup {
             get => true; // Always check on startup
-            set {
-                // Ignore attempts to disable - always keep enabled
-                checkOnStartup = true;
-                MarkDirty();
-            }
         }
 
         /// <summary>
@@ -87,11 +87,6 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         public bool AutoOpenSettingsWindow {
             get => true; // Always auto-open
-            set {
-                // Ignore attempts to disable - always keep enabled
-                autoOpenSettingsWindow = true;
-                MarkDirty();
-            }
         }
 
         /// <summary>
@@ -120,7 +115,7 @@ namespace NDream.AirConsole.Editor {
         /// Gets or sets the time when the last error occurred
         /// </summary>
         public DateTime LastErrorTime {
-            get => DateTime.TryParse(lastErrorTime, out var dt) ? dt : DateTime.MinValue;
+            get => DateTime.TryParse(lastErrorTime, out DateTime dt) ? dt : DateTime.MinValue;
             set {
                 lastErrorTime = value.ToString("O"); // ISO 8601 format
                 MarkDirty();
@@ -147,8 +142,8 @@ namespace NDream.AirConsole.Editor {
                 return false;
             }
 
-            var timeSinceLastCheck = DateTime.Now - LastCheckTime;
-            var requiredInterval = TimeSpan.FromHours(GetEffectiveCheckInterval());
+            TimeSpan timeSinceLastCheck = DateTime.Now - LastCheckTime;
+            TimeSpan requiredInterval = TimeSpan.FromHours(GetEffectiveCheckInterval());
 
             return timeSinceLastCheck >= requiredInterval;
         }
@@ -162,8 +157,8 @@ namespace NDream.AirConsole.Editor {
                 return TimeSpan.MaxValue;
             }
 
-            var timeSinceLastCheck = DateTime.Now - LastCheckTime;
-            var requiredInterval = TimeSpan.FromHours(GetEffectiveCheckInterval());
+            TimeSpan timeSinceLastCheck = DateTime.Now - LastCheckTime;
+            TimeSpan requiredInterval = TimeSpan.FromHours(GetEffectiveCheckInterval());
 
             return timeSinceLastCheck >= requiredInterval ? TimeSpan.Zero : requiredInterval - timeSinceLastCheck;
         }
@@ -177,7 +172,7 @@ namespace NDream.AirConsole.Editor {
                 return CheckIntervalHours;
             }
 
-            // Exponential backoff: 24h, 48h, 96h, 192h, max 192h
+            // Exponential backoff: 12h, 24h, 48h, 96h, max 96h
             int backoffMultiplier = Mathf.Min(1 << (FailedCheckCount - 1), 8);
             return CheckIntervalHours * backoffMultiplier;
         }
@@ -226,10 +221,10 @@ namespace NDream.AirConsole.Editor {
                 return "No recent errors";
             }
 
-            var info = $"Failed checks: {FailedCheckCount}";
+            string info = $"Failed checks: {FailedCheckCount}";
 
             if (LastErrorTime != DateTime.MinValue) {
-                var timeSinceError = DateTime.Now - LastErrorTime;
+                TimeSpan timeSinceError = DateTime.Now - LastErrorTime;
                 info += $", Last error: {timeSinceError.TotalHours:F1}h ago";
             }
 
@@ -251,7 +246,7 @@ namespace NDream.AirConsole.Editor {
         public bool ShouldAttemptRecovery() {
             // Attempt recovery if we've had network errors but some time has passed
             if (NetworkErrorDetected && FailedCheckCount > 0) {
-                var timeSinceError = DateTime.Now - LastErrorTime;
+                TimeSpan timeSinceError = DateTime.Now - LastErrorTime;
                 return timeSinceError.TotalHours >= 24; // Try recovery after 24 hours
             }
 
@@ -263,7 +258,7 @@ namespace NDream.AirConsole.Editor {
         /// </summary>
         private void MarkDirty() {
 #if UNITY_EDITOR
-            UnityEditor.EditorUtility.SetDirty(this);
+            EditorUtility.SetDirty(this);
 #endif
         }
 
@@ -273,9 +268,10 @@ namespace NDream.AirConsole.Editor {
         /// <returns>The UpdateSettings instance</returns>
         public static UpdateSettings Instance {
             get {
-                if (_instance == null) {
+                if (!_instance) {
                     _instance = LoadOrCreateSettings();
                 }
+
                 return _instance;
             }
         }
@@ -286,23 +282,24 @@ namespace NDream.AirConsole.Editor {
         /// <returns>UpdateSettings instance</returns>
         private static UpdateSettings LoadOrCreateSettings() {
 #if UNITY_EDITOR
-            // Try to load existing asset
-            var settings = UnityEditor.AssetDatabase.LoadAssetAtPath<UpdateSettings>(SETTINGS_ASSET_PATH);
 
-            if (settings == null) {
+            // Try to load existing asset
+            UpdateSettings settings = AssetDatabase.LoadAssetAtPath<UpdateSettings>(SettingsAssetPath);
+
+            if (!settings) {
                 // Create new settings with default values
                 settings = CreateInstance<UpdateSettings>();
 
                 // Ensure the directory exists
-                var directory = System.IO.Path.GetDirectoryName(SETTINGS_ASSET_PATH);
+                string directory = System.IO.Path.GetDirectoryName(SettingsAssetPath);
                 if (!System.IO.Directory.Exists(directory)) {
                     System.IO.Directory.CreateDirectory(directory);
                 }
 
                 // Create the asset
-                UnityEditor.AssetDatabase.CreateAsset(settings, SETTINGS_ASSET_PATH);
-                UnityEditor.AssetDatabase.SaveAssets();
-                UnityEditor.AssetDatabase.Refresh();
+                AssetDatabase.CreateAsset(settings, SettingsAssetPath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
             }
 
             return settings;
@@ -318,9 +315,7 @@ namespace NDream.AirConsole.Editor {
         private void OnEnable() {
             // Ensure fixed settings are applied
             automaticCheckEnabled = true;
-            checkIntervalHours = FIXED_CHECK_INTERVAL_HOURS;
-            checkOnStartup = true;
-            autoOpenSettingsWindow = true;
+            failedCheckCount = 0;
             MarkDirty();
         }
     }

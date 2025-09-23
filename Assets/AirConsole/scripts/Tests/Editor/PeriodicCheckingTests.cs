@@ -41,7 +41,7 @@ namespace NDream.AirConsole.Editor.Tests {
 
         private bool IsAutomaticCheckingInitialized() {
             // We can't directly access the private field, so we'll infer from behavior
-            var wasRunning = false;
+            bool wasRunning = false;
             try {
                 UpdateChecker.StopAutomaticChecking();
                 UpdateChecker.StartAutomaticChecking();
@@ -49,17 +49,17 @@ namespace NDream.AirConsole.Editor.Tests {
             } catch {
                 // If there's an issue, assume it wasn't running
             }
+
             return wasRunning;
         }
 
         #region Periodic Checking System Tests
-
         [Test]
         public void StartAutomaticChecking_WithPersistentFailures_DisablesAutomaticChecking() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
-            var originalFailedCount = settings.FailedCheckCount;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
+            int originalFailedCount = settings.FailedCheckCount;
 
             try {
                 // Set up scenario with 5+ failures
@@ -80,8 +80,8 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void ShouldDisableAutomaticChecking_WithHighFailureCount_ReturnsTrue() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalFailedCount = settings.FailedCheckCount;
+            UpdateSettings settings = UpdateSettings.Instance;
+            int originalFailedCount = settings.FailedCheckCount;
 
             try {
                 settings.FailedCheckCount = 5;
@@ -99,9 +99,9 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void ShouldDisableAutomaticChecking_WithNetworkErrorsOverSevenDays_ReturnsTrue() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalNetworkError = settings.NetworkErrorDetected;
-            var originalLastError = settings.LastErrorTime;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalNetworkError = settings.NetworkErrorDetected;
+            DateTime originalLastError = settings.LastErrorTime;
 
             try {
                 settings.NetworkErrorDetected = true;
@@ -119,49 +119,12 @@ namespace NDream.AirConsole.Editor.Tests {
         }
 
         [Test]
-        public void ValidateCheckInterval_WithBelowMinimum_ReturnsMinimum() {
-            // Act
-            int validatedInterval = UpdateChecker.ValidateCheckInterval(12); // Below 24h minimum
-
-            // Assert
-            Assert.AreEqual(24, validatedInterval, "Should return minimum 24 hours");
-        }
-
-        [Test]
-        public void ValidateCheckInterval_WithAboveMaximum_ReturnsMaximum() {
-            // Act
-            int validatedInterval = UpdateChecker.ValidateCheckInterval(200); // Above 168h maximum
-
-            // Assert
-            Assert.AreEqual(168, validatedInterval, "Should return maximum 168 hours");
-        }
-
-        [Test]
-        public void ValidateCheckInterval_WithValidValue_ReturnsValue() {
-            // Act
-            int validatedInterval = UpdateChecker.ValidateCheckInterval(48);
-
-            // Assert
-            Assert.AreEqual(48, validatedInterval, "Should return the valid input value");
-        }
-
-        [Test]
-        public void GetEffectiveCheckInterval_ReturnsSettingsInterval() {
-            // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalInterval = settings.CheckIntervalHours;
-
-            try {
-                settings.CheckIntervalHours = 48;
-
-                // Act
-                int effectiveInterval = UpdateChecker.GetEffectiveCheckInterval();
-
-                // Assert
-                Assert.AreEqual(48, effectiveInterval, "Should return the settings check interval");
-            } finally {
-                settings.CheckIntervalHours = originalInterval;
-            }
+        public void ValidateCheckInterval_WithAnyValue_ReturnsFixed12Hours() {
+            // Act & Assert - All inputs should return 12 hours
+            Assert.AreEqual(12, UpdateChecker.ValidateCheckInterval(1), "Should always return 12 hours");
+            Assert.AreEqual(12, UpdateChecker.ValidateCheckInterval(24), "Should always return 12 hours");
+            Assert.AreEqual(12, UpdateChecker.ValidateCheckInterval(48), "Should always return 12 hours");
+            Assert.AreEqual(12, UpdateChecker.ValidateCheckInterval(200), "Should always return 12 hours");
         }
 
         [Test]
@@ -180,8 +143,8 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void ForceRestartPeriodicChecking_StopsAndStartsChecking() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
 
             try {
                 settings.AutomaticCheckEnabled = true;
@@ -196,17 +159,15 @@ namespace NDream.AirConsole.Editor.Tests {
                 settings.AutomaticCheckEnabled = originalEnabled;
             }
         }
-
         #endregion
 
         #region Intelligent Scheduling Tests
-
         [Test]
         public void StartAutomaticChecking_LogsIntervalAndFailures() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
-            var originalFailedCount = settings.FailedCheckCount;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
+            int originalFailedCount = settings.FailedCheckCount;
 
             try {
                 settings.AutomaticCheckEnabled = true;
@@ -223,8 +184,8 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void StopAutomaticChecking_CleansUpProperly() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
 
             try {
                 settings.AutomaticCheckEnabled = true;
@@ -239,17 +200,15 @@ namespace NDream.AirConsole.Editor.Tests {
                 settings.AutomaticCheckEnabled = originalEnabled;
             }
         }
-
         #endregion
 
         #region Error State Management Tests
-
         [Test]
         public void ResetErrorState_ClearsFailuresAndReenablesChecking() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
-            var originalFailedCount = settings.FailedCheckCount;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
+            int originalFailedCount = settings.FailedCheckCount;
 
             try {
                 // Set up error state
@@ -271,8 +230,8 @@ namespace NDream.AirConsole.Editor.Tests {
         [Test]
         public void GetDiagnosticInfo_IncludesFailureInformation() {
             // Arrange
-            var settings = UpdateSettings.Instance;
-            var originalFailedCount = settings.FailedCheckCount;
+            UpdateSettings settings = UpdateSettings.Instance;
+            int originalFailedCount = settings.FailedCheckCount;
 
             try {
                 settings.FailedCheckCount = 3;
@@ -287,18 +246,16 @@ namespace NDream.AirConsole.Editor.Tests {
                 settings.FailedCheckCount = originalFailedCount;
             }
         }
-
         #endregion
 
         #region Integration Tests
-
         [Test]
         public void PeriodicCheckingSystem_IntegrationTest() {
             // Test the complete periodic checking system integration
-            var settings = UpdateSettings.Instance;
-            var originalEnabled = settings.AutomaticCheckEnabled;
-            var originalFailedCount = settings.FailedCheckCount;
-            var originalLastCheck = settings.LastCheckTime;
+            UpdateSettings settings = UpdateSettings.Instance;
+            bool originalEnabled = settings.AutomaticCheckEnabled;
+            int originalFailedCount = settings.FailedCheckCount;
+            DateTime originalLastCheck = settings.LastCheckTime;
 
             try {
                 // Test case 1: Normal operation
@@ -319,7 +276,6 @@ namespace NDream.AirConsole.Editor.Tests {
                 UpdateChecker.ResetErrorState();
                 Assert.AreEqual(0, settings.FailedCheckCount, "Should reset failures");
                 Assert.IsTrue(settings.AutomaticCheckEnabled, "Should re-enable checking");
-
             } finally {
                 // Restore original settings
                 settings.AutomaticCheckEnabled = originalEnabled;
@@ -328,7 +284,6 @@ namespace NDream.AirConsole.Editor.Tests {
                 UpdateChecker.StopAutomaticChecking();
             }
         }
-
         #endregion
     }
 }
