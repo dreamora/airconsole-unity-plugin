@@ -127,10 +127,23 @@ namespace NDream.AirConsole.Editor {
         public static bool CheckForUpdatesAsync(bool force = false) {
             var settings = UpdateSettings.Instance;
 
+            // Check if we should attempt recovery from error state
+            if (!force && settings.ShouldAttemptRecovery()) {
+                AirConsoleLogger.Log(() => "Attempting recovery from previous error state");
+                force = true; // Allow recovery attempt
+            }
+
             // Always respect rate limiting for manual checks unless explicitly forced
             if (!force && !settings.CanCheckNow()) {
                 var timeUntilNext = settings.TimeUntilNextCheck();
-                AirConsoleLogger.LogWarning(() => $"Update check rate limited. Next check available in {timeUntilNext:hh\\:mm\\:ss}");
+                string rateLimitMessage = $"Update check rate limited. Next check available in {timeUntilNext:hh\\:mm\\:ss}";
+
+                // Add diagnostic info if there are previous errors
+                if (settings.FailedCheckCount > 0) {
+                    rateLimitMessage += $" ({settings.GetDiagnosticInfo()})";
+                }
+
+                AirConsoleLogger.LogWarning(() => rateLimitMessage);
                 return false;
             }
 
@@ -141,7 +154,13 @@ namespace NDream.AirConsole.Editor {
             }
 
             // Use the enhanced GithubUpdate method with rate limiting
-            return GithubUpdate.BeginBackgroundUpdateCheck(force);
+            bool result = GithubUpdate.BeginBackgroundUpdateCheck(force);
+
+            if (!result) {
+                AirConsoleLogger.LogWarning(() => "Failed to start update check - may be rate limited or already in progress");
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -202,6 +221,54 @@ namespace NDream.AirConsole.Editor {
             // Reset notification state so that if an update becomes available again, it will show
             _lastNotifiedVersion = null;
             _lastUpdateAvailableState = false;
+        }
+
+        /// <summary>
+        /// Resets the error state and re-enables automatic checking
+        /// </summary>
+        public static void ResetErrorState() {
+            var settings = UpdateSettings.Instance;
+            settings.ResetFailedCheckCount();
+
+            if (!settings.AutomaticCheckEnabled) {
+                settings.AutomaticCheckEnabled = true;
+                AirConsoleLogger.Log(() => "Automatic update checking re-enabled after error state reset");
+
+                // Restart automatic checking
+                RestartAutomaticChecking();
+            }
+
+            AirConsoleLogger.Log(() => "Update checker error state reset successfully");
+        }
+
+        /// <summary>
+        /// Gets diagnostic information about the current update checker state
+        /// </summary>
+        /// <returns>Formatted diagnostic string</returns>
+        public static string GetDiagnosticInfo() {
+            var settings = UpdateSettings.Instance;
+            var info = new System.Text.StringBuilder();
+
+            info.AppendLine($"Update Available: {IsUpdateAvailable}");
+            info.AppendLine($"Check In Progress: {IsCheckInProgress}");
+            info.AppendLine($"Automatic Checking: {settings.AutomaticCheckEnabled}");
+            info.AppendLine($"Last Check: {(LastCheckTime == DateTime.MinValue ? "Never" : LastCheckTime.ToString("yyyy-MM-dd HH:mm:ss"))}");
+            info.AppendLine($"Current Version: {CurrentVersion}");
+            info.AppendLine($"Latest Version: {(LatestVersion?.ToString() ?? "Unknown")}");
+            info.AppendLine($"Failed Check Count: {settings.FailedCheckCount}");
+
+            if (settings.FailedCheckCount > 0) {
+                info.AppendLine($"Error Details: {settings.GetDiagnosticInfo()}");
+            }
+
+            var timeUntilNext = TimeUntilNextCheck();
+            if (timeUntilNext > TimeSpan.Zero) {
+                info.AppendLine($"Next Check Available: {timeUntilNext:hh\\:mm\\:ss}");
+            } else {
+                info.AppendLine("Next Check: Available now");
+            }
+
+            return info.ToString();
         }
 
         /// <summary>

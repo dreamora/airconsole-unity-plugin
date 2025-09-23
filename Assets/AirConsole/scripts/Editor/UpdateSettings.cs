@@ -18,6 +18,9 @@ namespace NDream.AirConsole.Editor {
         [SerializeField] private bool checkOnStartup = true;
         [SerializeField] private bool autoOpenSettingsWindow = true; // Auto-open settings window when update is available
         [SerializeField] private int failedCheckCount = 0; // Track consecutive failures for backoff
+        [SerializeField] private string lastErrorMessage = ""; // Last error message for debugging
+        [SerializeField] private string lastErrorTime = ""; // When the last error occurred
+        [SerializeField] private bool networkErrorDetected = false; // Flag for persistent network issues
 
         private static UpdateSettings _instance;
 
@@ -99,6 +102,39 @@ namespace NDream.AirConsole.Editor {
         }
 
         /// <summary>
+        /// Gets or sets the last error message for debugging purposes
+        /// </summary>
+        public string LastErrorMessage {
+            get => lastErrorMessage ?? "";
+            set {
+                lastErrorMessage = value ?? "";
+                MarkDirty();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the time when the last error occurred
+        /// </summary>
+        public DateTime LastErrorTime {
+            get => DateTime.TryParse(lastErrorTime, out var dt) ? dt : DateTime.MinValue;
+            set {
+                lastErrorTime = value.ToString("O"); // ISO 8601 format
+                MarkDirty();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether a persistent network error has been detected
+        /// </summary>
+        public bool NetworkErrorDetected {
+            get => networkErrorDetected;
+            set {
+                networkErrorDetected = value;
+                MarkDirty();
+            }
+        }
+
+        /// <summary>
         /// Checks if an update check can be performed now based on rate limiting
         /// </summary>
         /// <returns>True if a check can be performed now</returns>
@@ -143,17 +179,79 @@ namespace NDream.AirConsole.Editor {
         }
 
         /// <summary>
-        /// Resets the failed check count (call on successful check)
+        /// Resets the failed check count and clears error state (call on successful check)
         /// </summary>
         public void ResetFailedCheckCount() {
             FailedCheckCount = 0;
+            LastErrorMessage = "";
+            LastErrorTime = DateTime.MinValue;
+            NetworkErrorDetected = false;
         }
 
         /// <summary>
-        /// Increments the failed check count (call on failed check)
+        /// Increments the failed check count and records error information
+        /// </summary>
+        /// <param name="errorMessage">The error message to record</param>
+        /// <param name="isNetworkError">Whether this is a network-related error</param>
+        public void IncrementFailedCheckCount(string errorMessage = null, bool isNetworkError = false) {
+            FailedCheckCount++;
+
+            if (!string.IsNullOrEmpty(errorMessage)) {
+                LastErrorMessage = errorMessage;
+                LastErrorTime = DateTime.Now;
+            }
+
+            if (isNetworkError) {
+                NetworkErrorDetected = true;
+            }
+        }
+
+        /// <summary>
+        /// Increments the failed check count (backward compatibility overload)
         /// </summary>
         public void IncrementFailedCheckCount() {
-            FailedCheckCount++;
+            IncrementFailedCheckCount(null, false);
+        }
+
+        /// <summary>
+        /// Gets diagnostic information about the current error state
+        /// </summary>
+        /// <returns>Formatted diagnostic string</returns>
+        public string GetDiagnosticInfo() {
+            if (FailedCheckCount == 0) {
+                return "No recent errors";
+            }
+
+            var info = $"Failed checks: {FailedCheckCount}";
+
+            if (LastErrorTime != DateTime.MinValue) {
+                var timeSinceError = DateTime.Now - LastErrorTime;
+                info += $", Last error: {timeSinceError.TotalHours:F1}h ago";
+            }
+
+            if (!string.IsNullOrEmpty(LastErrorMessage)) {
+                info += $", Message: {LastErrorMessage}";
+            }
+
+            if (NetworkErrorDetected) {
+                info += " (Network issues detected)";
+            }
+
+            return info;
+        }
+
+        /// <summary>
+        /// Checks if the system should attempt recovery from error state
+        /// </summary>
+        /// <returns>True if recovery should be attempted</returns>
+        public bool ShouldAttemptRecovery() {
+            // Attempt recovery if we've had network errors but some time has passed
+            if (NetworkErrorDetected && FailedCheckCount > 0) {
+                var timeSinceError = DateTime.Now - LastErrorTime;
+                return timeSinceError.TotalHours >= 24; // Try recovery after 24 hours
+            }
+
+            return false;
         }
 
         /// <summary>
