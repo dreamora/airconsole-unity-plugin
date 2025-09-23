@@ -72,8 +72,15 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
+            // Check if automatic checking should be disabled due to persistent failures
+            if (ShouldDisableAutomaticChecking()) {
+                AirConsoleLogger.LogWarning(() => "Automatic checking disabled due to persistent failures. Use 'Reset Error State' to re-enable.");
+                settings.AutomaticCheckEnabled = false;
+                return;
+            }
+
             _automaticCheckingInitialized = true;
-            AirConsoleLogger.Log(() => "UpdateChecker automatic checking system started");
+            AirConsoleLogger.Log(() => $"UpdateChecker automatic checking system started (interval: {settings.CheckIntervalHours}h, failures: {settings.FailedCheckCount})");
 
             // Check on startup if enabled - always allow first startup check to bypass rate limiting
             if (settings.CheckOnStartup) {
@@ -86,7 +93,7 @@ namespace NDream.AirConsole.Editor {
                 AirConsoleLogger.Log(() => "Startup update check disabled in settings");
             }
 
-            // Set up periodic checking
+            // Set up periodic checking with intelligent scheduling
             EditorApplication.update += PeriodicCheckHandler;
         }
 
@@ -100,9 +107,16 @@ namespace NDream.AirConsole.Editor {
             }
 
             AirConsoleLogger.Log(() => "UpdateChecker automatic checking system stopped");
+
+            // Clean up periodic checking
+            EditorApplication.update -= PeriodicCheckHandler;
+
+            // Reset state
             _automaticCheckingInitialized = false;
             _isScheduledCheckPending = false;
-            EditorApplication.update -= PeriodicCheckHandler;
+
+            // Cancel any pending delayed calls for update checks
+            // Note: We can't directly remove specific delayed calls, but we check state in the callback
         }
 
         /// <summary>
@@ -179,7 +193,108 @@ namespace NDream.AirConsole.Editor {
             return GithubUpdate.TimeUntilNextCheck();
         }
 
+        /// <summary>
+        /// Validates and enforces check interval constraints
+        /// </summary>
+        /// <param name="requestedIntervalHours">The requested check interval in hours</param>
+        /// <returns>The validated interval (minimum 24 hours)</returns>
+        public static int ValidateCheckInterval(int requestedIntervalHours) {
+            const int minimumInterval = 24;
+            const int maximumInterval = 168; // 1 week
 
+            if (requestedIntervalHours < minimumInterval) {
+                AirConsoleLogger.LogWarning(() => $"Check interval {requestedIntervalHours}h is below minimum. Using {minimumInterval}h instead.");
+                return minimumInterval;
+            }
+
+            if (requestedIntervalHours > maximumInterval) {
+                AirConsoleLogger.LogWarning(() => $"Check interval {requestedIntervalHours}h is above maximum. Using {maximumInterval}h instead.");
+                return maximumInterval;
+            }
+
+            return requestedIntervalHours;
+        }
+
+        /// <summary>
+        /// Gets the current effective check interval considering backoff
+        /// </summary>
+        /// <returns>The effective check interval in hours</returns>
+        public static int GetEffectiveCheckInterval() {
+            var settings = UpdateSettings.Instance;
+            return settings.CheckIntervalHours;
+        }
+
+        /// <summary>
+        /// Checks if the automatic checking system should be disabled due to persistent failures
+        /// </summary>
+        /// <returns>True if automatic checking should be disabled</returns>
+        public static bool ShouldDisableAutomaticChecking() {
+            var settings = UpdateSettings.Instance;
+
+            // Disable after 5 consecutive failures
+            if (settings.FailedCheckCount >= 5) {
+                return true;
+            }
+
+            // Disable if we've had network errors for more than 7 days
+            if (settings.NetworkErrorDetected && settings.LastErrorTime != DateTime.MinValue) {
+                var timeSinceError = DateTime.Now - settings.LastErrorTime;
+                if (timeSinceError.TotalDays > 7) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Gets the status of the periodic checking system
+        /// </summary>
+        /// <returns>Status information about the periodic checking system</returns>
+        public static string GetPeriodicCheckingStatus() {
+            var settings = UpdateSettings.Instance;
+            var status = new System.Text.StringBuilder();
+
+            status.AppendLine($"Automatic Checking: {(settings.AutomaticCheckEnabled ? "Enabled" : "Disabled")}");
+            status.AppendLine($"System Initialized: {_automaticCheckingInitialized}");
+            status.AppendLine($"Check Interval: {settings.CheckIntervalHours} hours");
+            status.AppendLine($"Failed Check Count: {settings.FailedCheckCount}");
+
+            if (settings.FailedCheckCount > 0) {
+                var effectiveInterval = GetEffectiveCheckInterval();
+                status.AppendLine($"Effective Interval (with backoff): {effectiveInterval} hours");
+            }
+
+            var timeUntilNext = TimeUntilNextCheck();
+            if (timeUntilNext > TimeSpan.Zero) {
+                status.AppendLine($"Next Check Available In: {timeUntilNext:hh\\:mm\\:ss}");
+            } else {
+                status.AppendLine("Next Check: Available now");
+            }
+
+            if (_isScheduledCheckPending) {
+                status.AppendLine("Status: Check scheduled for next update cycle");
+            } else if (IsCheckInProgress) {
+                status.AppendLine("Status: Check in progress");
+            } else {
+                status.AppendLine("Status: Idle");
+            }
+
+            return status.ToString();
+        }
+
+        /// <summary>
+        /// Forces a restart of the periodic checking system (useful for testing or recovery)
+        /// </summary>
+        public static void ForceRestartPeriodicChecking() {
+            AirConsoleLogger.Log(() => "Force restarting periodic checking system");
+            StopAutomaticChecking();
+
+            // Small delay to ensure cleanup is complete
+            EditorApplication.delayCall += () => {
+                StartAutomaticChecking();
+            };
+        }
 
         #endregion
 
@@ -323,7 +438,7 @@ namespace NDream.AirConsole.Editor {
         #region Private Implementation
 
         /// <summary>
-        /// Handles periodic checking logic
+        /// Handles periodic checking logic with intelligent scheduling
         /// </summary>
         private static void PeriodicCheckHandler() {
             if (!_automaticCheckingInitialized) {
@@ -334,6 +449,15 @@ namespace NDream.AirConsole.Editor {
 
             // Stop if automatic checking is disabled
             if (!settings.AutomaticCheckEnabled) {
+                AirConsoleLogger.Log(() => "Automatic checking disabled, stopping periodic handler");
+                StopAutomaticChecking();
+                return;
+            }
+
+            // Disable automatic checking after persistent failures (5+ consecutive failures)
+            if (settings.FailedCheckCount >= 5) {
+                AirConsoleLogger.LogWarning(() => $"Disabling automatic checking after {settings.FailedCheckCount} consecutive failures. Use 'Reset Error State' to re-enable.");
+                settings.AutomaticCheckEnabled = false;
                 StopAutomaticChecking();
                 return;
             }
@@ -346,16 +470,60 @@ namespace NDream.AirConsole.Editor {
                 return;
             }
 
-            // Check if it's time for a scheduled check
-            if (!_isScheduledCheckPending && settings.CanCheckNow()) {
+            // Intelligent scheduling: Check if it's time for a scheduled check
+            if (!_isScheduledCheckPending && ShouldPerformPeriodicCheck()) {
                 _isScheduledCheckPending = true;
 
                 // Schedule the check for the next editor update to avoid blocking
                 EditorApplication.delayCall += () => {
                     _isScheduledCheckPending = false;
-                    CheckForUpdatesAsync();
+
+                    // Double-check conditions before actually performing the check
+                    if (_automaticCheckingInitialized && settings.AutomaticCheckEnabled && ShouldPerformPeriodicCheck()) {
+                        AirConsoleLogger.Log(() => "Performing scheduled periodic update check");
+                        CheckForUpdatesAsync();
+                    } else {
+                        AirConsoleLogger.Log(() => "Skipping scheduled check due to changed conditions");
+                    }
                 };
             }
+        }
+
+        /// <summary>
+        /// Determines if a periodic check should be performed based on intelligent scheduling
+        /// </summary>
+        /// <returns>True if a periodic check should be performed</returns>
+        private static bool ShouldPerformPeriodicCheck() {
+            var settings = UpdateSettings.Instance;
+
+            // Basic rate limiting check
+            if (!settings.CanCheckNow()) {
+                return false;
+            }
+
+            // Don't check too frequently if we've had recent failures
+            if (settings.FailedCheckCount > 0) {
+                var timeSinceLastError = DateTime.Now - settings.LastErrorTime;
+                var minimumWaitTime = TimeSpan.FromHours(Math.Min(24, Math.Pow(2, settings.FailedCheckCount)));
+
+                if (timeSinceLastError < minimumWaitTime) {
+                    return false;
+                }
+            }
+
+            // Check if we're in a reasonable time window (avoid checking during likely inactive periods)
+            var now = DateTime.Now;
+            var hourOfDay = now.Hour;
+
+            // Prefer checking during typical working hours (8 AM to 8 PM) but don't be too restrictive
+            // This is just a preference, not a hard requirement
+            var isPreferredTime = hourOfDay >= 8 && hourOfDay <= 20;
+
+            // If it's been more than 48 hours since last check, check regardless of time
+            var timeSinceLastCheck = now - settings.LastCheckTime;
+            var isOverdue = timeSinceLastCheck.TotalHours > 48;
+
+            return isPreferredTime || isOverdue;
         }
 
         /// <summary>
@@ -413,10 +581,50 @@ namespace NDream.AirConsole.Editor {
 
                     // Start automatic checking system
                     StartAutomaticChecking();
+
+                    // Register cleanup handler for editor shutdown
+                    RegisterShutdownHandler();
                 } catch (Exception ex) {
                     AirConsoleLogger.LogError(() => $"Failed to initialize UpdateChecker on startup: {ex.Message}");
                 }
             };
+        }
+
+        /// <summary>
+        /// Registers the shutdown handler for proper cleanup
+        /// </summary>
+        private static void RegisterShutdownHandler() {
+            // Register for editor shutdown to ensure proper cleanup
+            EditorApplication.quitting += OnEditorShutdown;
+            AirConsoleLogger.Log(() => "UpdateChecker shutdown handler registered");
+        }
+
+        /// <summary>
+        /// Handles cleanup when the editor is shutting down
+        /// </summary>
+        private static void OnEditorShutdown() {
+            try {
+                AirConsoleLogger.Log(() => "UpdateChecker performing shutdown cleanup");
+
+                // Stop automatic checking and clean up callbacks
+                StopAutomaticChecking();
+
+                // Unregister the shutdown handler to prevent multiple calls
+                EditorApplication.quitting -= OnEditorShutdown;
+
+                // Clear any pending delayed calls
+                EditorApplication.delayCall -= () => CheckForUpdatesAsync();
+
+                // Reset static state
+                _automaticCheckingInitialized = false;
+                _isScheduledCheckPending = false;
+                _lastUpdateAvailableState = false;
+                _lastNotifiedVersion = null;
+
+                AirConsoleLogger.Log(() => "UpdateChecker shutdown cleanup completed");
+            } catch (Exception ex) {
+                AirConsoleLogger.LogError(() => $"Error during UpdateChecker shutdown: {ex.Message}");
+            }
         }
 
         #endregion
