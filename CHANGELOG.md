@@ -13,6 +13,25 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 ### Removed
 
 - **Android**: The android library no longer manages AudioFocus or overriding the usage from USAGE_GAME.
+### Added
+
+- **Editor**: Add the ability to update the AirConsole Unity Plugin with a click from the inspector directly.
+- **Editor**: Added a new  plugin update checker window
+  - Checking Github Releases for new releases, installing them with one click
+  - Comprehensive tooltip system for all interactive elements
+  - Smooth animations and loading indicators for update notifications
+  - Confirmation dialogs for important actions (update installation, dismiss notifications, reset settings)
+- **Editor**: Settings window received visual polish updates
+  - Consistent color theme, styling and structure throughout the settings window
+
+
+### Fixed
+
+- **Editor**: Fixed excessive popup dialogs during plugin update process - now shows only one confirmation dialog
+- **Editor**: Fixed button layout inconsistencies with proper alignment and consistent spacing throughout UI
+- **Editor**: Fixed container structure overlaps where section headers conflicted with container boundaries
+- **Editor**: Fixed unit tests that required manual dialog interaction, making all tests fully automated
+- **Editor**: Fixed reset settings showing unnecessary success confirmation - user can see changes in UI
 
 ## [2.6.1] - 2025-09-02
 
