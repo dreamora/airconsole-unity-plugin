@@ -870,17 +870,36 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="level_name">The name of the level.</param>
         /// <param name="level_version">The version of the level.</param>
-        /// <param name="device_ids">An array of device IDs of the users should be included in the result. Default is all connected controllers.</param>
+        /// <param name="deviceIds">An array of device IDs of the users should be included in the result. Default is all connected controllers.</param>
         /// <param name="ranks">An array of high score rank types. High score rank types can include data from across the world, only a specific area or a users friends. Valid array entries are "world",  "country",  "region", "city", "friends", "partner". Default is ["world"].</param>
         /// <param name="total">Amount of high scores to return per rank type. Default is 8.</param>
         /// <param name="top">Amount of top high scores to return per rank type. top is part of total. Default is 5.</param>
-        public void RequestHighScores(string level_name, string level_version, List<int> device_ids = null, List<string> ranks = null,
+        /// <exception cref="ArgumentException">Thrown when deviceIds is an empty list.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when any deviceId is invalid (negative or SCREEN).</exception>
+        /// <exception cref="InvalidOperationException">Thrown when any deviceId has no UID (device not connected or user not logged in).</exception>
+        /// <exception cref="NotReadyException">Thrown when the AirConsole Unity Plugin is not ready.</exception>
+        public void RequestHighScores(string level_name, string level_version, List<int> deviceIds = null, List<string> ranks = null,
             int total = -1, int top = -1) {
             List<string> uids = null;
-            if (device_ids != null) {
+            if (deviceIds != null) {
+                if (deviceIds.Count == 0) {
+                    throw new ArgumentException("deviceIds must contain at least one deviceId", nameof(deviceIds));
+                }
+
                 uids = new List<string>();
-                foreach (int device_id in device_ids) {
-                    uids.Add(GetUID(device_id));
+                foreach (int deviceId in deviceIds) {
+                    if (deviceId <= 0) {
+                        throw new ArgumentOutOfRangeException(nameof(deviceIds), 
+                            $"deviceId {deviceId} is invalid (must be a connected controller; SCREEN=0 is not allowed).");
+                    }
+
+                    string uid = GetUID(deviceId);
+                    if (uid == null) {
+                        throw new InvalidOperationException(
+                            $"No UID for deviceId {deviceId}. The device is not connected or the user is not logged in.");
+                    }
+
+                    uids.Add(uid);
                 }
             }
 
@@ -912,13 +931,26 @@ namespace NDream.AirConsole {
         /// <param name="level_name">The name of the level the user was playing. This should be a human readable string because it appears in the high score sharing image. You can also just pass an empty string.</param>
         /// <param name="level_version">The version of the level the user was playing. This is for your internal use.</param>
         /// <param name="score">The score the user has achieved</param>
-        /// <param name="device_id">The device ID of the user that achieved the high score.</param>
+        /// <param name="deviceId">The device ID of the user that achieved the high score.</param>
         /// <param name="data">Custom high score data (e.g. can be used to implement Ghost modes or include data to verify that it is not a fake high score).</param>
         /// <param name="score_string">A short human readable representation of the score. (e.g. "4 points in 3s"). Defaults to "X points" where x is the score converted to an integer.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when deviceId is invalid (negative or SCREEN).</exception>
+        /// <exception cref="InvalidOperationException">Thrown when deviceId has no UID (device not connected or user not logged in).</exception>
+        /// <exception cref="NotReadyException">Thrown when the AirConsole Unity Plugin is not ready.</exception>
         /// </summary>
-        public void StoreHighScore(string level_name, string level_version, float score, int device_id, JObject data = null,
+        public void StoreHighScore(string level_name, string level_version, float score, int deviceId, JObject data = null,
             string score_string = null) {
-            string uid = GetUID(device_id);
+            if (deviceId <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(deviceId), 
+                    $"deviceId {deviceId} is invalid (must be a connected controller; SCREEN=0 is not allowed).");
+            }
+
+            string uid = GetUID(deviceId);
+            if (uid == null) {
+                throw new InvalidOperationException(
+                    $"No UID for deviceId {deviceId}. The device is not connected or the user is not logged in.");
+            }
+
             StoreHighScore(level_name, level_version, score, uid, data, score_string);
         }
 
@@ -971,15 +1003,39 @@ namespace NDream.AirConsole {
         /// <param name="level_name">The name of the level the user was playing. This should be a human readable string because it appears in the high score sharing image. You can also just pass an empty string.</param>
         /// <param name="level_version">The version of the level the user was playing. This is for your internal use.</param>
         /// <param name="score">The score the user has achieved</param>
-        /// <param name="device_ids">The device IDs of the users that achieved the high score.</param>
+        /// <param name="deviceIds">The device IDs of the users that achieved the high score.</param>
         /// <param name="data">Custom high score data (e.g. can be used to implement Ghost modes or include data to verify that it is not a fake high score).</param>
         /// <param name="score_string">A short human readable representation of the score. (e.g. "4 points in 3s"). Defaults to "X points" where x is the score converted to an integer.</param>
+        /// <exception cref="ArgumentNullException">Thrown when deviceIds is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when deviceIds is an empty list.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when any deviceId is invalid (negative or SCREEN).</exception>
+        /// <exception cref="InvalidOperationException">Thrown when any deviceId has no UID (device not connected or user not logged in).</exception>
+        /// <exception cref="NotReadyException">Thrown when the AirConsole Unity Plugin is not ready.</exception>
         /// </summary>
-        public void StoreHighScore(string level_name, string level_version, float score, List<int> device_ids, JObject data = null,
+        public void StoreHighScore(string level_name, string level_version, float score, List<int> deviceIds, JObject data = null,
             string score_string = null) {
+            if (deviceIds == null) {
+                throw new ArgumentNullException(nameof(deviceIds));
+            }
+
+            if (deviceIds.Count == 0) {
+                throw new ArgumentException("deviceIds must contain at least one deviceId", nameof(deviceIds));
+            }
+
             List<string> uids = new List<string>();
-            foreach (int device_id in device_ids) {
-                uids.Add(GetUID(device_id));
+            foreach (int deviceId in deviceIds) {
+                if (deviceId <= 0) {
+                    throw new ArgumentOutOfRangeException(nameof(deviceIds), 
+                        $"deviceId {deviceId} is invalid (must be a connected controller; SCREEN=0 is not allowed).");
+                }
+
+                string uid = GetUID(deviceId);
+                if (uid == null) {
+                    throw new InvalidOperationException(
+                        $"No UID for deviceId {deviceId}. The device is not connected or the user is not logged in.");
+                }
+
+                uids.Add(uid);
             }
 
             StoreHighScore(level_name, level_version, score, uids, data, score_string);
@@ -1030,19 +1086,35 @@ namespace NDream.AirConsole {
         /// Requests persistent data from the servers.
         /// Will call onPersistentDataLoaded when data was received.
         /// </summary>
-        /// <param name="device_ids">The device IDs for which you would like to request the persistent data.</param>
-        public void RequestPersistentData(List<int> device_ids) {
-            if (device_ids == null) {
-                throw new ArgumentNullException(nameof(device_ids));
+        /// <param name="deviceIds">The device IDs for which you would like to request the persistent data.</param>
+        /// <exception cref="ArgumentNullException">Thrown when deviceIds is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when deviceIds is an empty list.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when any deviceId is invalid (negative or SCREEN).</exception>
+        /// <exception cref="InvalidOperationException">Thrown when any deviceId has no UID (device not connected or user not logged in).</exception>
+        /// <exception cref="NotReadyException">Thrown when the AirConsole Unity Plugin is not ready.</exception>
+        public void RequestPersistentData(List<int> deviceIds) {
+            if (deviceIds == null) {
+                throw new ArgumentNullException(nameof(deviceIds));
             }
 
-            if (device_ids.Count < 1) {
-                throw new ArgumentException("device_ids must contain at least one device_id");
+            if (deviceIds.Count == 0) {
+                throw new ArgumentException("deviceIds must contain at least one deviceId", nameof(deviceIds));
             }
 
             List<string> uids = new List<string>();
-            foreach (int device_id in device_ids) {
-                uids.Add(GetUID(device_id));
+            foreach (int deviceId in deviceIds) {
+                if (deviceId <= 0) {
+                    throw new ArgumentOutOfRangeException(nameof(deviceIds), 
+                        $"deviceId {deviceId} is invalid (must be a connected controller; SCREEN=0 is not allowed).");
+                }
+
+                string uid = GetUID(deviceId);
+                if (uid == null) {
+                    throw new InvalidOperationException(
+                        $"No UID for deviceId {deviceId}. The device is not connected or the user is not logged in.");
+                }
+
+                uids.Add(uid);
             }
 
             RequestPersistentData(uids);
@@ -1081,9 +1153,22 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="key">The key of the data entry.</param>
         /// <param name="value">The value of the data entry.</param>
-        /// <param name="device_id">The device ID for which the data should be stored.</param>
-        public void StorePersistentData(string key, JToken value, int device_id) {
-            string uid = GetUID(device_id);
+        /// <param name="deviceId">The device ID for which the data should be stored.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when deviceId is invalid (negative or SCREEN).</exception>
+        /// <exception cref="InvalidOperationException">Thrown when deviceId has no UID (device not connected or user not logged in).</exception>
+        /// <exception cref="NotReadyException">Thrown when the AirConsole Unity Plugin is not ready.</exception>
+        public void StorePersistentData(string key, JToken value, int deviceId) {
+            if (deviceId <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(deviceId), 
+                    $"deviceId {deviceId} is invalid (must be a connected controller; SCREEN=0 is not allowed).");
+            }
+
+            string uid = GetUID(deviceId);
+            if (uid == null) {
+                throw new InvalidOperationException(
+                    $"No UID for deviceId {deviceId}. The device is not connected or the user is not logged in.");
+            }
+
             StorePersistentData(key, value, uid);
         }
 
