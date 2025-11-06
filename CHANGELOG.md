@@ -6,6 +6,16 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- Convenience API overloads that accept device IDs for leaderboards and persistent data:
+  - `RequestHighScores(..., List<int> deviceIds, ...)`
+  - `StoreHighScore(..., int deviceId, ...)`, `StoreHighScore(..., List<int> deviceIds, ...)`
+  - `RequestPersistentData(List<int> deviceIds)`
+  - `StorePersistentData(string key, JToken value, int deviceId)`
+  
+  These overloads internally resolve device IDs to UIDs (GetUID), eliminating manual conversions, and include fail-fast validation with clear errors for invalid or disconnected device IDs.
+
 ### Changed
 
 - Minimum Versions: The Unity minimum versions have been updated to match `CVE-2025-59489` fix versions.
