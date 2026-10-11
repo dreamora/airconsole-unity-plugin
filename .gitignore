@@ -3,11 +3,20 @@
 # =============== #
 Temp/
 /Library/
+/Library_*/
+/TestBuilds/
 Logs/
 Temp/
 UserSettings/
 AssetStoreTools/
 AssetStoreTools.*
+
+# ==================== #
+# AirConsole generated #
+# ==================== #
+
+/Assets/WebGLTemplates/**/[Cc]ontroller.html*
+
 
 # ===================================== #
 # Visual Studio / MonoDevelop generated #
@@ -36,10 +45,14 @@ ehthumbs.db
 Thumbs.db
 
 # ============ #
-# IDEA generated #
+# Backup / merge artifacts (defense-in-depth: keep proprietary source that
+# leaks into *.orig/*.bak/*~ from being staged by `git add -A`). The guard
+# in scripts/check-proprietary-source.sh is the enforced backstop.
 # ============ #
-/.idea
-
+*.orig
+*.rej
+*.bak
+*~
 
 # ============ #
 # Visual Studio Code generated #
@@ -50,3 +63,45 @@ TestBuilds/
 Assets/AirConsole/airconsole.prefs*
 
 Assets/WebGLTemplates/**/airconsole-settings.js
+
+# ============ #
+# IntellJ Code Style
+# ============ #
+
+!/.idea/
+/.idea/*
+!/.idea/.idea.airconsole-unity-plugin/
+!/.idea/.idea.airconsole-unity-plugin/.idea/
+/.idea/.idea.airconsole-unity-plugin/.idea/*
+!/.idea/.idea.airconsole-unity-plugin/.idea/codeStyles/
+
+# BEGIN idream-managed agent workspace
+# local files and generated output
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+*.bak
+.cache/
+tmp/
+coverage/
+dist/
+ai-setup-backup-*.tar.gz
+.backup/*
+!.backup/
+!.backup/README.md
+
+# agent/runtime workspace
+.serena/
+.state/
+.worktrees/
+.claude/worktrees/
+.claude/*.local.json
+.omc/
+.compound-engineering/
+.sisyphus/
+.planning/
+
+# Python bytecode from scripts/
+__pycache__/

@@ -6,13 +6,42 @@ Release notes follow the [keep a changelog](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+## [2.6.2] - 2026-09-29
+
+With version 2.6.2, we are targeting Android TV and Android Automotive related issues impacting or blocking game releases.
+This includes security related updates like requiring fixed Unity versions and increasing Android Target SDK version.
+
+### Added
+
+- **Unity API:** `GetGameConfiguration` function to request the runtime configuration information for this game and platform.
+- **Unity API:** `OnMaximumVolumeChanged` event to notify when the games maximum volume must be changed.
+- **Android:** After the last device disconnects, the webview is reset, meeting the expected game behavior.
+- **Android:** The Android application version is now reported to the platform through the webview URL.
+- **Android:** Support for native game sizing, enabling web overlays with cutouts for the game camera.
+- **Android Audio Focus:** Improvements to match the expected behavior on Android Automotive. audio focus.
+- **Editor:** `NDream.Unity.Builder` provides a zero-argument headless build entry point for CI.
+
 ### Changed
 
-- Minimum Versions: The Unity minimum versions have been updated to match `CVE-2025-59489` fix versions.
+- **Android Support**: Better dependency handling through Gradle processor integration. Removal of included files and dependency to AndroidManifest and Gradle Templates by AirConsole.
+- **Android Target SDK:** Increased to Android API 37 to meet Google Play requirements per Nov 1, 2025.
+- **Unity Minimum Versions:** The Unity minimum versions have been updated to match `CVE-2025-59489` fix versions.
+- **Code Style**: Examples and scripts have been aligned on code style.
 
+### Fixed
+
+- **Android:** WebView renderer process recovery: when the Android WebView render process is killed or crashes, the plugin automatically recreates the WebView, replays all configured state, and reloads the last URL.
+- **Android Automotive:** Steering wheel media buttons (skip, play/pause, etc.) now control the active media source (Bluetooth, radio) instead of being swallowed by the game while a native game is running.
+- **Android:** Platform overlay resizes correctly on Android TV
+- **Android:** Native game sizing is communicated to the AirConsole platform earlier for consistent initial layout (PRO-1747)
+- **Editor:** The Android flow no longer initializes a native WebView inside the Editor. There is no Editor WebView implementation since unity-webview dropped macOS support, and on an Android build target the attempt failed with a JNI exception in `Start()`.
+- **Editor:** Project configuration checks index.html directly when validating API version usage. This prevents the index.html from becoming empty.
+- 
 ### Removed
 
-- **Android**: The android library no longer manages AudioFocus or overriding the usage from USAGE_GAME.
+- **unity-webview:** The unsupported iOS (`Plugins/iOS/*.mm`) and macOS (`Plugins/WebView.bundle`) native files were removed to focus energy on improved webview performance and resilience.
 
 ## [2.6.1] - 2025-09-02
 
@@ -144,15 +173,15 @@ For completeness as this is a 2.5.0 rerelease, the 2.5.0 release notes are repea
   #71)
 - Added :gift_heart:: Partner specific highscore
   - New rank `partner` for `RequestHighScores` that will limit the response to highscores the player has achieve on the same partner. See
-    the [partner specific high score section of the high score guide](https://developers.airconsole.com/#!/guides/highscore#partner)
+      the [partner specific high score section of the high score guide](https://developers.airconsole.com/#!/guides/highscore#partner)
 - Added :gift_heart:: Multi-screen multiplayer
   API [see Multi-screen multiplayer guide](https://developers.airconsole.com/#!/guides/multiplayer)
   - provides information to enable online multiplayer matchmaking against screens in the same car as well screens in the same type of
-    partner environment (e.g. car brand).
+      partner environment (e.g. car brand).
 - Added :gift_heart:: New capability: Player
   Silencing [see Handling Players connecting guide](https://developers.airconsole.com/#!/guides/player_silencing)
   - Support for Player Silencing in the AirConsole component. For more information visit
-    the [AirConsole Player Silencing Guide](https://developers.airconsole.com/#!/guides/player_silencing).
+      the [AirConsole Player Silencing Guide](https://developers.airconsole.com/#!/guides/player_silencing).
 - Added :gift_heart:: Support for EMSDK_PYTHON when building for WebGL in Unity 2019 which requires python2 that needs to be manually
   installed on OSX Ventura / Sonoma. If your python2 is not in `/usr/local/bin/python2` you can update the path in the AirConsole Settings
   window.
@@ -185,15 +214,15 @@ Gameplay rounds are controlled through AirConsole's setActivePlayers API.
 
 - Added :gift_heart:: Partner specific highscore
   - New rank `partner` for `RequestHighScores` that will limit the response to highscores the player has achieve on the same partner. See
-    the [partner specific high score section of the high score guide](https://developers.airconsole.com/#!/guides/highscore#partner)
+      the [partner specific high score section of the high score guide](https://developers.airconsole.com/#!/guides/highscore#partner)
 - Added :gift_heart:: Multi-screen multiplayer
   API [see Multi-screen multiplayer guide](https://developers.airconsole.com/#!/guides/multiplayer)
   - provides information to enable online multiplayer matchmaking against screens in the same car as well screens in the same type of
-    partner environment (e.g. car brand).
+      partner environment (e.g. car brand).
 - Added :gift_heart:: New capability: Player
   Silencing [see Handling Players connecting guide](https://developers.airconsole.com/#!/guides/player_silencing)
   - Support for Player Silencing in the AirConsole component. For more information visit
-    the [AirConsole Player Silencing Guide](https://developers.airconsole.com/#!/guides/player_silencing).
+      the [AirConsole Player Silencing Guide](https://developers.airconsole.com/#!/guides/player_silencing).
 - Added :gift_heart:: Support for EMSDK_PYTHON when building for WebGL in Unity 2019 which requires python2 that needs to be manually
   installed on OSX Ventura / Sonoma. If your python2 is not in `/usr/local/bin/python2` you can update the path in the AirConsole Settings
   window.

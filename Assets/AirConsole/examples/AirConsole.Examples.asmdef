@@ -2,7 +2,8 @@
     "name": "AirConsole.Examples",
     "rootNamespace": "NDream.AirConsole.Examples",
     "references": [
-        "AirConsole.Runtime"
+        "AirConsole.Runtime",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

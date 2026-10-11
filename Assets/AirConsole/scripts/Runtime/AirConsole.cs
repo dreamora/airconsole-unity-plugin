@@ -1,20 +1,20 @@
 ﻿#if !UNITY_EDITOR && UNITY_ANDROID
 #define AIRCONSOLE_ANDROID_RUNTIME
 #endif
-using UnityEngine;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System;
-using System.Diagnostics;
-using System.Threading;
-using NDream.AirConsole.Android.Plugin;
-using WebSocketSharp.Server;
-using Newtonsoft.Json.Linq;
-using UnityEngine.Serialization;
-using Debug = UnityEngine.Debug;
-using UnityEngine.SceneManagement;
 
 namespace NDream.AirConsole {
+    using NDream.AirConsole.Android.Plugin;
+    using Newtonsoft.Json.Linq;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
+    using System.Diagnostics;
+    using System.Threading;
+    using System;
+    using UnityEngine.SceneManagement;
+    using UnityEngine.Serialization;
+    using UnityEngine;
+    using WebSocketSharp.Server;
+
     public enum StartMode {
         VirtualControllers,
         Debug,
@@ -64,6 +64,13 @@ namespace NDream.AirConsole {
     public delegate void OnResume();
 
     /// <summary>
+    /// Used to notify the game about changes to audio focus and maximum allowed volume.
+    /// </summary>
+    /// <param name="hasAudioFocus">True, if the application has AudioFocus. Otherwise the application should stop all audio playback e.g. AudioListener.pause = !hasAudioFocus</param>
+    /// <param name="newMaximumVolume">The received volume is a float value between 0.0 (muted) and 1.0 (maximum volume).</param>
+    public delegate void OnGameAudioFocusChanged(bool hasAudioFocus, float newMaximumVolume);
+
+    /// <summary>
     /// Gets called when the safe area of the screen changes.
     /// This event provides information about the visible area of the screen where your
     /// game should display important content.
@@ -73,7 +80,6 @@ namespace NDream.AirConsole {
 
     public class AirConsole : MonoBehaviour {
         #region airconsole unity config
-
         [Tooltip("The controller html file for your game")]
         public UnityEngine.Object controllerHtml;
 
@@ -110,15 +116,13 @@ namespace NDream.AirConsole {
 
         [Tooltip("Used as local IP instead of your public IP in Unity Editor. Use this to use the controller together with ngrok")]
         public string LocalIpOverride;
-
         #endregion
 
 #if !DISABLE_AIRCONSOLE
 
         #region airconsole api
-        
         // ReSharper disable MemberCanBePrivate.Global UnusedMember.Global
-        
+
         /// <summary>
         /// Device ID of the screen
         /// </summary>
@@ -262,6 +266,17 @@ namespace NDream.AirConsole {
         /// </summary>
         public event OnResume onResume;
 
+        /// <summary>
+        /// Used to notify the game about changes to audio focus and maximum allowed volume.
+        /// This must be implemented for Android based games and must be registered before OnReady is invoked.
+        /// </summary>
+        /// <param name="hasAudioFocus">True, if the application has AudioFocus. Otherwise the application should stop all audio playback e.g. AudioListener.pause = !hasAudioFocus</param>
+        /// <param name="newMaximumVolume">The received volume is a float value between 0.0 (muted) and 1.0 (maximum volume).</param>
+        public event OnGameAudioFocusChanged OnGameAudioFocusChanged;
+
+        private bool _canHaveAudioFocus = true;
+        private bool _ignoreAudioFocusLoss = true;
+
         internal event Action UnityDestroy;
         internal event Action UnityResume;
         internal event Action UnityPause;
@@ -284,6 +299,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="to">The device ID to send the message to.</param>
         /// <param name="data">The data to send.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void Message(int to, object data) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -301,6 +317,7 @@ namespace NDream.AirConsole {
         /// Sends a message to all devices.
         /// </summary>
         /// <param name="data">The message to send.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void Broadcast(object data) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -336,6 +353,7 @@ namespace NDream.AirConsole {
         /// http:// developers.airconsole.com/#/guides/device_ids_and_states
         /// </summary>
         /// <returns>The device identifier.</returns>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public int GetDeviceId() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -359,8 +377,9 @@ namespace NDream.AirConsole {
         /// are active players by calling getActivePlayerDeviceIds().
         /// The screen can call this function every time a game round starts.
         /// </summary>
-        /// <param name="data">The maximum number of controllers that should
+        /// <param name="max_players">The maximum number of controllers that should
         /// get a player number assigned.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void SetActivePlayers(int max_players = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -412,6 +431,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <returns>The UID.</returns>
         /// <param name="device_id">The device id for which you want the uid. Default is this device.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public string GetUID(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -434,6 +454,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="device_id">The device ID of which you want the custom state. Default is this device.</param>
         /// <returns> The custom data previously set by the device.</returns>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public JToken GetCustomDeviceState(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -466,6 +487,7 @@ namespace NDream.AirConsole {
         /// Returns the nickname of a user.
         /// </summary>
         /// <param name="device_id">The device id for which you want the nickname. Default is this device. Screens don't have nicknames.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public string GetNickname(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -498,6 +520,7 @@ namespace NDream.AirConsole {
         /// Returns the current IETF language tag of a device e.g. "en" or "en-US"
         /// </summary>
         /// <param name="device_id">The device id for which you want the language. Default is this device.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public string GetLanguage(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -557,6 +580,7 @@ namespace NDream.AirConsole {
         /// Translates an array of UI Text or TextMesh Components. The existing text in the UI Text or Text Mesh has to contain a string ID within double curly brackets. {{example}}
         /// </summary>
         /// <param name="elements">The Array of elements that should be translated.</param>
+        /// <exception cref="Exception">Thrown if an element is not a <see cref="UnityEngine.UI.Text"/> or <see cref="TextMesh"/> component.</exception>
         public void TranslateUIElements(object[] elements) {
             for (int i = 0; i < elements.Length; ++i) {
                 string id = null;
@@ -601,6 +625,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="device_id">The device id for which you want a profile picture. Defaults to this device. Screens don't have profile pictures.</param>
         /// <param name="size">The size of in pixels of the picture. Default is 64.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public string GetProfilePicture(int device_id = -1, int size = 64) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -635,6 +660,7 @@ namespace NDream.AirConsole {
         /// This allows you to have a synchronized clock: You can send the servertime in a message to know exactly at what point something happened on a device.
         /// </summary>
         /// <returns> Timestamp in milliseconds.</returns>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public long GetServerTime() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -644,8 +670,28 @@ namespace NDream.AirConsole {
         }
 
         /// <summary>
+        /// Returns the platform capability configuration delivered in the ready event.
+        /// Use this to branch on device capabilities instead of platform or partner
+        /// names.
+        /// </summary>
+        /// <returns>
+        /// A JToken containing:
+        ///   transparentVideoSupport (bool) - True, if the current environment supports videos with transparency?
+        ///   unityVideoSupport (bool) - True, if the current video allows unity based games to play videos.
+        /// </returns>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
+        public JToken GetGameConfiguration() {
+            if (!IsAirConsoleUnityPluginReady()) {
+                throw new NotReadyException();
+            }
+
+            return _gameConfiguration ?? new JObject();
+        }
+
+        /// <summary>
         /// Request that all devices return to the AirConsole store.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void NavigateHome() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -661,6 +707,7 @@ namespace NDream.AirConsole {
         /// Request that all devices load a game by url. Note that the custom DeviceStates are preserved.
         /// If you don't want that, override SetCustomDeviceState(null) on every device before calling this function.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void NavigateTo(string url) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -677,6 +724,7 @@ namespace NDream.AirConsole {
         /// Sets the custom DeviceState of this device.
         /// </summary>
         /// <param name="data">The custom data to set.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void SetCustomDeviceState(object data) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -701,6 +749,7 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="key">The property name.</param>
         /// <param name="value">The property value.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void SetCustomDeviceStateProperty(string key, object value) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -735,6 +784,7 @@ namespace NDream.AirConsole {
         /// onAdComplete is called on all connected devices when the
         /// advertisement is complete or no advertisement was shown.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void ShowAd() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -749,6 +799,7 @@ namespace NDream.AirConsole {
         /// <summary>
         /// Returns the device ID of the master controller. Premium devices are prioritized.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public int GetMasterControllerDeviceId() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -770,6 +821,7 @@ namespace NDream.AirConsole {
         /// <summary>
         /// Returns all controller device ids that have loaded your game.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public List<int> GetControllerDeviceIds() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -790,6 +842,7 @@ namespace NDream.AirConsole {
         /// <summary>
         /// Returns true if a user is logged in.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public bool IsUserLoggedIn(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -824,6 +877,7 @@ namespace NDream.AirConsole {
         /// <param name="ranks">An array of high score rank types. High score rank types can include data from across the world, only a specific area or a users friends. Valid array entries are "world",  "country",  "region", "city", "friends", "partner". Default is ["world"].</param>
         /// <param name="total">Amount of high scores to return per rank type. Default is 8.</param>
         /// <param name="top">Amount of top high scores to return per rank type. top is part of total. Default is 5.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void RequestHighScores(string level_name, string level_version, List<string> uids = null, List<string> ranks = null,
             int total = -1, int top = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
@@ -875,6 +929,7 @@ namespace NDream.AirConsole {
         /// <param name="data">Custom high score data (e.g. can be used to implement Ghost modes or include data to verify that it is not a fake high score).</param>
         /// <param name="score_string">A short human readable representation of the score. (e.g. "4 points in 3s"). Defaults to "X points" where x is the score converted to an integer.</param>
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void StoreHighScore(string level_name, string level_version, float score, string uid, JObject data = null,
             string score_string = null) {
             List<string> uids = new();
@@ -893,6 +948,7 @@ namespace NDream.AirConsole {
         /// <param name="data">Custom high score data (e.g. can be used to implement Ghost modes or include data to verify that it is not a fake high score).</param>
         /// <param name="score_string">A short human readable representation of the score. (e.g. "4 points in 3s"). Defaults to "X points" where x is the score converted to an integer.</param>
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public void StoreHighScore(string level_name, string level_version, float score, List<string> uids, JObject data = null,
             string score_string = null) {
             if (!IsAirConsoleUnityPluginReady()) {
@@ -925,17 +981,18 @@ namespace NDream.AirConsole {
         }
 
         /// <summary>
-        /// Gets thrown when you call an API method before OnReady was called.
+        /// The exception thrown when an AirConsole API method is called before OnReady has been invoked.
         /// </summary>
-        public class NotReadyException : SystemException {
-            public NotReadyException() : base() { }
-        }
+        public class NotReadyException : SystemException { }
 
         /// <summary>
         /// Requests persistent data from the servers.
         /// Will call onPersistentDataLoaded when data was received.
         /// </summary>
         /// <param name="uids">The uids for which you would like to request the persistent data.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="uids"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown if <paramref name="uids"/> contains no elements.</exception>
         public void RequestPersistentData(List<string> uids) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -973,6 +1030,8 @@ namespace NDream.AirConsole {
         /// <param name="key">The key of the data entry.</param>
         /// <param name="value">The value of the data entry.</param>
         /// <param name="uid">The uid for which the data should be stored.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="uid"/> is null or empty.</exception>
         public void StorePersistentData(string key, JToken value, string uid) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -995,6 +1054,7 @@ namespace NDream.AirConsole {
         /// Returns true if the device is premium
         /// </summary>
         /// <param name="device_id">The device_id that should be checked. Only controllers can be premium. Default is this device.</param>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public bool IsPremium(int device_id = -1) {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -1026,6 +1086,7 @@ namespace NDream.AirConsole {
         /// <summary>
         /// Returns all device Ids that are premium.
         /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
         public List<int> GetPremiumDeviceIds() {
             if (!IsAirConsoleUnityPluginReady()) {
                 throw new NotReadyException();
@@ -1104,14 +1165,13 @@ namespace NDream.AirConsole {
         #endregion
 
         #region unity functions
-
         protected void Awake() {
             if (instance != this) {
                 Destroy(gameObject);
             }
 
-            // always set default object name
-            // important for unity webgl communication
+            // Always set default object name
+            // Critical for unity webgl communication
             gameObject.name = "AirConsole";
 
             if (IsAndroidRuntime) {
@@ -1119,6 +1179,8 @@ namespace NDream.AirConsole {
 
                 defaultScreenHeight = Screen.height;
                 _pluginManager = new PluginManager(this);
+                _pluginManager.OnUpdateVolume += HandleOnMaxVolumeChanged;
+                _pluginManager.OnAudioFocusChange += HandleNativeAudioFocusChanged;
             }
         }
 
@@ -1174,7 +1236,7 @@ namespace NDream.AirConsole {
             wsListener.onResume += OnResume;
 
             if (Application.isEditor) {
-                // start websocket connection
+                // Start websocket and connection
                 wsServer = new WebSocketServer(Settings.webSocketPort);
                 wsServer.AddWebSocketService(Settings.WEBSOCKET_PATH, () => wsListener);
                 wsServer.Start();
@@ -1184,7 +1246,7 @@ namespace NDream.AirConsole {
                 }
             } else {
                 if (Application.platform == RuntimePlatform.WebGLPlayer) {
-                    // call external javascript init function
+                    // Call external javascript init function
                     Application.ExternalCall("onGameReady", autoScaleCanvas);
                 }
             }
@@ -1219,7 +1281,6 @@ namespace NDream.AirConsole {
             float height = Screen.height * heightValue;
             float width = Screen.width * GetFloatFromMessage(safeAreaObj, "width", 1);
 
-            // TODO(Marc) Update when we send width / height that are no longer bottom / right
             Rect safeArea = new() {
                 y = y,
                 height = height,
@@ -1249,15 +1310,18 @@ namespace NDream.AirConsole {
             _runtimeConfigurator?.RefreshConfiguration();
 
             if (IsAndroidRuntime) {
-                //back button on TV remotes
+                // Back button on TV remotes
                 if (Input.GetKeyDown(KeyCode.Escape)) {
                     Application.Quit();
                 }
             }
         }
-        
+
+        protected void LateUpdate() => ProcessEvents();
+
+        protected void FixedUpdate() => ProcessEvents();
+
         private void ProcessEvents() {
-            // dispatch event queue on main unity thread
             while (eventQueue.Count > 0) {
                 eventQueue.Dequeue().Invoke();
             }
@@ -1290,11 +1354,9 @@ namespace NDream.AirConsole {
             return FindFirstObjectByType<T>();
 #endif
         }
-
         #endregion
 
         #region internal functions
-
         private void OnDeviceStateChange(JObject msg) {
             if (msg["device_id"] == null) {
                 return;
@@ -1302,25 +1364,25 @@ namespace NDream.AirConsole {
 
             try {
                 int deviceId = (int)msg["device_id"];
-                AllocateDeviceSlots(deviceId);
                 JToken deviceData = msg["device_data"];
-                if (deviceData != null && deviceData.HasValues) {
-                    _devices[deviceId] = deviceData;
-                } else {
-                    _devices[deviceId] = null;
-                }
 
-                if (onDeviceStateChange != null) {
-                    eventQueue.Enqueue(delegate() {
-                        if (onDeviceStateChange != null) {
-                            onDeviceStateChange(deviceId, GetDevice(_device_id));
-                        }
-                    });
-                }
+                // Queue all _devices modifications to run on the Unity main thread to avoid race conditions
+                eventQueue.Enqueue(delegate() {
+                    AllocateDeviceSlots(deviceId);
+                    if (deviceData != null && deviceData.HasValues) {
+                        _devices[deviceId] = deviceData;
+                    } else {
+                        _devices[deviceId] = null;
+                    }
 
-                if (Settings.debug.info) {
-                    AirConsoleLogger.Log(() => $"AirConsole: saved devicestate of {deviceId}");
-                }
+                    if (onDeviceStateChange != null) {
+                        onDeviceStateChange(deviceId, GetDevice(_device_id));
+                    }
+
+                    if (Settings.debug.info) {
+                        AirConsoleLogger.Log(() => $"AirConsole: saved devicestate of {deviceId}");
+                    }
+                });
             } catch (Exception e) {
                 if (Settings.debug.error) {
                     AirConsoleLogger.LogError(() => e.Message);
@@ -1416,53 +1478,117 @@ namespace NDream.AirConsole {
             }
         }
 
+        private void RequestAudioFocus() {
+            if (!_canHaveAudioFocus) {
+                AirConsoleLogger.Log(() => "AirConsole: Not requesting audio focus because the app is not allowed.");
+                return;
+            }
+
+            if (IsAndroidRuntime) {
+                HasAudioFocus = _pluginManager.RequestAudioFocus();
+            } else {
+                HasAudioFocus = true;
+            }
+
+            if (!HasAudioFocus) {
+                AirConsoleLogger.LogError(() =>
+                    "AirConsole: Failed to obtain audio focus. Audio may not work as expected. Should pause platform");
+            }
+        }
+
+        private void AbandonAudioFocus() {
+            HasAudioFocus = false;
+            if (IsAndroidRuntime) {
+                _pluginManager.AbandonAudioFocus();
+            }
+        }
+
+        private bool _firstReady = true;
+
+        // TODO(QAB-14400, QAB-14401): This does not yet work correctly - when going to web, we lose audio focus and due to that
+        //  we do not regain it when coming back from web in OnReady. We need to distinguish between the two paths
         private void OnReady(JObject msg) {
-            if (webViewLoadingCanvas) {
-                Destroy(webViewLoadingCanvas.gameObject);
+            _ignoreAudioFocusLoss = false;
+            if (_firstReady) {
+                _firstReady = false;
+                _canHaveAudioFocus = true;
             }
 
-            // parse server_time_offset
-            _server_time_offset = (int)msg["server_time_offset"];
+            RequestAudioFocus();
+            if (Application.platform == RuntimePlatform.Android) {
+                // Android based games must respect the volume change requests so we can correctly handle Android AudioFocus behavior as
+                //  demanded by Automotive on one side and Android 33+ on the other side.
+                if (OnGameAudioFocusChanged == null || OnGameAudioFocusChanged.GetInvocationList().Length == 0) {
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.isPlaying = false;
+                    throw new Exception("No listeners registered to OnGameAudioFocusChanged. Editor playback stopped.");
+#else
+                    throw new Exception("No listeners registered to OnGameAudioFocusChanged.");
+#endif
+                }
 
-            // parse device_id
-            _device_id = (int)msg["device_id"];
+                if (!Application.isEditor) {
+                    webViewObject.AbandonUnityAudioFocus();
 
-            // parse location
-            _location = (string)msg["location"];
-
-            if (msg["translations"] != null) {
-                _translations = new Dictionary<string, string>();
-                JObject translationObject = (JObject)msg["translations"];
-                if (translationObject != null) {
-                    foreach (KeyValuePair<string, JToken> keyValue in translationObject) {
-                        string value = (string)keyValue.Value;
-                        value = value.Replace("\\n", "\n");
-                        value = value.Replace("&lt;", "<");
-                        value = value.Replace("&gt;", ">");
-                        _translations.Add(keyValue.Key, value);
-                    }
+                    // TODO(PRO-1637): Implement the necessary pieces to properly handle AudioFocus changes on Android in conjunction with
+                    //  WebView and the AirConsole Unity Plugin.
+                }
+            } else {
+                if (OnGameAudioFocusChanged != null && OnGameAudioFocusChanged.GetInvocationList().Length > 0) {
+                    AirConsoleLogger.Log(() =>
+                        "Registration to event OnGameAudioFocusChanged identified. This will only be called when running on Android devices.");
                 }
             }
 
-
-            // load devices
-            _devices.Clear();
-            foreach (JToken data in (JToken)msg["devices"]) {
-                JToken assign = data;
-                if (data != null && !data.HasValues) {
-                    assign = null;
+            // Queue all state modifications to run on the Unity main thread to avoid race conditions
+            eventQueue.Enqueue(delegate() {
+                if (webViewLoadingCanvas) {
+                    Destroy(webViewLoadingCanvas.gameObject);
                 }
 
-                _devices.Add(assign);
-            }
+                // parse server_time_offset
+                _server_time_offset = (int)msg["server_time_offset"];
 
-            if (onReady != null) {
-                eventQueue.Enqueue(delegate() {
-                    if (onReady != null) {
-                        onReady((string)msg["code"]);
+                // parse device_id
+                _device_id = (int)msg["device_id"];
+
+                // parse location
+                _location = (string)msg["location"];
+
+                if (msg["translations"] != null) {
+                    _translations = new Dictionary<string, string>();
+                    JObject translationObject = (JObject)msg["translations"];
+                    if (translationObject != null) {
+                        foreach (KeyValuePair<string, JToken> keyValue in translationObject) {
+                            string value = (string)keyValue.Value;
+                            value = value.Replace("\\n", "\n");
+                            value = value.Replace("&lt;", "<");
+                            value = value.Replace("&gt;", ">");
+                            _translations.Add(keyValue.Key, value);
+                        }
                     }
-                });
-            }
+                }
+
+
+                // load devices
+                _devices.Clear();
+                foreach (JToken data in (JToken)msg["devices"]) {
+                    JToken assign = data;
+                    if (data != null && !data.HasValues) {
+                        assign = null;
+                    }
+
+                    _devices.Add(assign);
+                }
+
+                _gameConfiguration = msg["gameConfiguration"];
+
+                _receivedReady = true;
+
+                if (onReady != null) {
+                    onReady((string)msg["code"]);
+                }
+            });
         }
 
         private void OnDeviceProfileChange(JObject msg) {
@@ -1537,7 +1663,117 @@ namespace NDream.AirConsole {
             }
         }
 
+        /// <summary>
+        /// Resets the caches.
+        /// </summary>
+        /// <param name="taskToQueueAfterClear">Optional task to queue after the eventQueue gets cleared.</param>
+        private void ResetCaches(Action taskToQueueAfterClear) {
+            AirConsoleLogger.LogDevelopment(() => "Resetting AirConsole caches");
+
+            // Clear device and player data
+            _devices.Clear();
+            _players.Clear();
+
+            // Reset state variables
+            _device_id = 0;
+            _server_time_offset = 0;
+            _location = null;
+            _translations = null;
+            _gameConfiguration = null;
+            _receivedReady = false;
+
+            // Reset safe area
+            _safeAreaWasSet = false;
+            _lastSafeAreaParameters = null;
+            SafeArea = new Rect(0, 0, Screen.width, Screen.height);
+
+            // Clear event queue
+            eventQueue.Clear();
+            if (taskToQueueAfterClear != null) {
+                eventQueue.Enqueue(taskToQueueAfterClear);
+            }
+
+            AirConsoleLogger.LogDevelopment(() => "AirConsole caches reset complete");
+        }
+
+        private void UnsubscribeWebSocketEvents() {
+            // Unsubscribe all event handlers to prevent stale events
+            wsListener.OnSetSafeArea -= OnSetSafeArea;
+            wsListener.onReady -= OnReady;
+            wsListener.onClose -= OnClose;
+            wsListener.onMessage -= OnMessage;
+            wsListener.onDeviceStateChange -= OnDeviceStateChange;
+            wsListener.onConnect -= OnConnect;
+            wsListener.onDisconnect -= OnDisconnect;
+            wsListener.onCustomDeviceStateChange -= OnCustomDeviceStateChange;
+            wsListener.onDeviceProfileChange -= OnDeviceProfileChange;
+            wsListener.onAdShow -= OnAdShow;
+            wsListener.onAdComplete -= OnAdComplete;
+            wsListener.onGameEnd -= OnGameEnd;
+            wsListener.onHighScores -= OnHighScores;
+            wsListener.onHighScoreStored -= OnHighScoreStored;
+            wsListener.onPersistentDataStored -= OnPersistentDataStored;
+            wsListener.onPersistentDataLoaded -= OnPersistentDataLoaded;
+            wsListener.onPremium -= OnPremium;
+            wsListener.onPause -= OnPause;
+            wsListener.onResume -= OnResume;
+
+            if (IsAndroidOrEditor) {
+                wsListener.onLaunchApp -= OnLaunchApp;
+                wsListener.onUnityWebviewResize -= OnUnityWebviewResize;
+                wsListener.onUnityWebviewPlatformReady -= OnUnityWebviewPlatformReady;
+                wsListener.OnUpdateContentProvider -= OnUpdateContentProvider;
+                wsListener.OnPlatformReady -= HandlePlatformReady;
+            }
+        }
+
+        private void CleanupWebSocketListener() {
+            AirConsoleLogger.LogDevelopment(() => "Cleaning up WebSocket listener");
+
+            if (wsListener != null) {
+                // Unsubscribe all event handlers to prevent stale events
+                UnsubscribeWebSocketEvents();
+                wsListener = null;
+            }
+
+            // Stop websocket server if in editor
+            StopWebsocketServer();
+
+            AirConsoleLogger.LogDevelopment(() => "WebSocket listener cleanup complete");
+        }
+
+        private void ReloadWebView() {
+            if (!_receivedReady) {
+                AirConsoleLogger.LogDevelopment(() => "Skipping reload. We have not yet left the Player Lobby.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_webViewOriginalUrl) || string.IsNullOrEmpty(_webViewConnectionUrl)) {
+                List<string> missingComponents = new();
+                if (string.IsNullOrEmpty(_webViewOriginalUrl)) {
+                    missingComponents.Add("original URL");
+                }
+
+                if (string.IsNullOrEmpty(_webViewConnectionUrl)) {
+                    missingComponents.Add("connection URL");
+                }
+
+                string missing = string.Join(" and ", missingComponents);
+                AirConsoleLogger.LogDevelopment(() => $"Cannot recreate webview - missing {missing}");
+                return;
+            }
+
+            if (webViewObject) {
+                AirConsoleLogger.LogDevelopment(() => $"Reloading webview with URL: {_webViewOriginalUrl}");
+                LoadAndroidWebviewUrl(_webViewOriginalUrl);
+            } else {
+                AirConsoleLogger.LogError(() => "Reloading webview failed, no webViewObject found.");
+            }
+        }
+
         private void OnGameEnd(JObject msg) {
+            _ignoreAudioFocusLoss = true;
+            AbandonAudioFocus();
             _webViewManager.RequestStateTransition(WebViewManager.WebViewState.FullScreen);
 
             try {
@@ -1552,6 +1788,13 @@ namespace NDream.AirConsole {
                 if (Settings.debug.info) {
                     AirConsoleLogger.Log(() => "AirConsole: onGameEnd");
                 }
+
+                // Reset all caches and recreate webview on the main thread
+                eventQueue.Enqueue(delegate {
+                    // We want to chain RecreateWebView to ensure it happens independent of
+                    //  the eventQueue getting cleared and related side effects.
+                    ResetCaches(ReloadWebView);
+                });
             } catch (Exception e) {
                 if (Settings.debug.error) {
                     AirConsoleLogger.LogError(() => e.Message);
@@ -1674,6 +1917,8 @@ namespace NDream.AirConsole {
         }
 
         private void OnPause(JObject msg) {
+            AbandonAudioFocus();
+
             try {
                 if (onPause != null) {
                     eventQueue.Enqueue(delegate() {
@@ -1694,6 +1939,9 @@ namespace NDream.AirConsole {
         }
 
         private void OnResume(JObject msg) {
+            // When we resume, we can have audio focus again.
+            _canHaveAudioFocus = true;
+            RequestAudioFocus();
             try {
                 if (onResume != null) {
                     eventQueue.Enqueue(delegate() {
@@ -1736,6 +1984,24 @@ namespace NDream.AirConsole {
         }
 
         /// <summary>
+        /// Maximum Audio Volume allowed at this time.<br />
+        /// A value of 0 indicates, that the game should be muted right now and all audio output should be paused.<br />
+        /// A value of 1 indicates, that the game can play audio at full volume.<br />
+        /// Values in between should be used to set the volume of the audio output.<br />
+        /// This value can change at any time and you are expected to listen to OnMaximumVolumeChanged and adjust accordingly immediately.
+        /// </summary>
+        /// <value>1</value>
+        public float MaximumAudioVolume { get; private set; } = 1;
+
+        /// <summary>
+        /// Does the game currently have audio focus?<br />
+        /// If false, the game should not play any audio at all.<br />
+        /// If true, the game can play audio, respecting the MaximumAudioVolume property.<br />
+        /// This value can change at any time and you are expected to listen to OnGameAudioFocusChanged and adjust accordingly immediately.
+        /// </summary>
+        public bool HasAudioFocus { get; private set; } = true;
+
+        /// <summary>
         /// True, if this is the Android platform running on the device, not the editor.
         /// </summary>
         internal static bool IsAndroidRuntime {
@@ -1766,19 +2032,24 @@ namespace NDream.AirConsole {
         private int defaultScreenHeight;
         private List<UnityEngine.UI.CanvasScaler> fixedCanvasScalers = new();
 
+        private Action _reloadWebviewHandler;
         private PluginManager _pluginManager;
 
+        private bool _receivedReady = false;
         private List<JToken> _devices = new();
         private int _device_id;
         private int _server_time_offset;
         private string _location;
         private Dictionary<string, string> _translations;
+        private JToken _gameConfiguration;
         private readonly List<int> _players = new();
         private readonly Queue<Action> eventQueue = new();
         private bool _safeAreaWasSet;
         private JObject _lastSafeAreaParameters;
         private WebViewManager _webViewManager;
         private bool _logPlatformMessages;
+        private string _webViewConnectionUrl;
+        private string _webViewOriginalUrl;
 
         private IRuntimeConfigurator _runtimeConfigurator;
 
@@ -1789,12 +2060,16 @@ namespace NDream.AirConsole {
                 return;
             }
 
+            // Unregister event handlers before stopping to prevent race conditions
+            UnsubscribeWebSocketEvents();
+
             wsServer.Stop();
             wsServer = null;
         }
 
         private void OnClose() {
-            _devices.Clear();
+            // Queue the clear operation to run on the Unity main thread to avoid race conditions
+            eventQueue.Enqueue(delegate() { _devices.Clear(); });
         }
 
         public static string GetUrl(StartMode mode) {
@@ -1876,13 +2151,9 @@ namespace NDream.AirConsole {
 
         private int GetScaledWebViewHeight() => (int)((float)webViewHeight * Screen.height / defaultScreenHeight);
 
-        private void OnConnectUrlReceived (string connectionUrl) {
+        private void OnConnectUrlReceived(string connectionUrl) {
             _pluginManager.OnConnectionUrlReceived -= OnConnectUrlReceived;
-            eventQueue.Enqueue(delegate {
-                // connectionUrl = "client?id=bmw-idc-23&runtimePlatform=android&homeCountry=DE&SwPu=24-11";
-                CreateAndroidWebview(connectionUrl);
-            });
-
+            eventQueue.Enqueue(delegate { CreateAndroidWebview(connectionUrl); });
         }
 
         private string ComputeUrlVersion(string version) {
@@ -1928,7 +2199,7 @@ namespace NDream.AirConsole {
         private void PrepareWebviewOverlay() {
             webViewLoadingCanvas = new GameObject("WebViewLoadingCanvas").AddComponent<Canvas>();
             webViewLoadingCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            
+
             webViewLoadingBG = new GameObject("WebViewLoadingBG").AddComponent<UnityEngine.UI.Image>();
             webViewLoadingBG.color = Color.black;
             webViewLoadingBG.transform.SetParent(webViewLoadingCanvas.transform, true);
@@ -1944,6 +2215,7 @@ namespace NDream.AirConsole {
             } else {
                 webViewLoadingImage.rectTransform.sizeDelta = new Vector2(Screen.width / 2, Screen.height / 2);
             }
+
             webViewLoadingImage.preserveAspect = true;
             if (!webViewLoadingSprite) {
                 webViewLoadingImage.sprite = Resources.Load("androidtv-loadingscreen", typeof(Sprite)) as Sprite;
@@ -1952,61 +2224,124 @@ namespace NDream.AirConsole {
 
         private void CreateAndroidWebview(string connectionUrl) {
             AirConsoleLogger.LogDevelopment(() => $"CreateAndroidWebview with connection url {connectionUrl}");
-            if (webViewObject == null) {
+            if (!webViewObject) {
+                _webViewConnectionUrl = connectionUrl;
+
                 webViewObject = new GameObject("WebViewObject").AddComponent<WebViewObject>();
                 if (Application.isPlaying) {
                     DontDestroyOnLoad(webViewObject.gameObject);
                 }
 
-                webViewObject.Init(ProcessJS,
-                    err => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView error: {err}"),
-                    httpError => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView HttpError: {httpError}"),
-                    url => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView Loaded URL {url}"),
-                    started => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView started: {started}"),
-                    hooked => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView hooked: {hooked}"),
-                    cookies => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView cookies: {cookies}"),
-                    true, false);
+                webViewObject.SetOnAudioFocusChanged(HandleWebViewAudioFocusChanged);
+
+                if (Application.isEditor) {
+                    // The Editor has no native webview: unity-webview 1.1.8 removed its macOS build, and
+                    // on an Android build target Init would call JNI with no JVM. The WebViewObject stays
+                    // headless on purpose. WebViewManager and every WebViewObject call below return when
+                    // the native handle is null, so the rest of this method runs unchanged. The Init
+                    // callbacks (ProcessJS, ...) stay null; the Editor gets its messages from the
+                    // websocket listener, not from a webview.
+                    AirConsoleLogger.LogDevelopment(() => "Editor: running the Android flow without a native webview.");
+                } else {
+                    InitNativeWebview();
+                }
 
                 if (IsAndroidRuntime && _pluginManager != null) {
                     _pluginManager.OnReloadWebview += () => webViewObject.Reload();
                     _pluginManager.InitializeOfflineCheck();
                 }
-#if UNITY_ANDROID
-                string urlOverride = AndroidIntentUtils.GetIntentExtraString("base_url", string.Empty);
-                string url = !string.IsNullOrEmpty(urlOverride) ? urlOverride : Settings.AIRCONSOLE_BASE_URL;
-                AirConsoleLogger.LogDevelopment(() => $"BaseURL Override: {urlOverride}");
-#else
-                string url = Settings.AIRCONSOLE_BASE_URL;
-#endif
 
-                url += connectionUrl;
+                string baseUrl;
                 if (IsAndroidRuntime) {
-                    url += $"&bundle-version={GetAndroidBundleVersionCode()}";
+                    string urlOverride = AndroidIntentUtils.GetIntentExtraString("base_url", string.Empty);
+                    baseUrl = !string.IsNullOrEmpty(urlOverride) ? urlOverride : Settings.AIRCONSOLE_BASE_URL;
+                    AirConsoleLogger.LogDevelopment(() => $"BaseURL Override: {urlOverride}");
+                } else {
+                    baseUrl = Settings.AIRCONSOLE_BASE_URL;
                 }
 
-                url += "&game-id=" + Application.identifier;
-                url += "&game-version=" + androidGameVersion;
-                url += "&unity-version=" + Application.unityVersion;
+                androidGameVersion = AndroidIntentUtils.GetIntentExtraString("game_version", androidGameVersion);
+                bool nativeSizingSupported = ResolveNativeGameSizingSupport(nativeGameSizingSupported);
 
+                string url = BuildWebviewUrl(
+                    baseUrl, connectionUrl, IsAndroidRuntime,
+                    IsAndroidRuntime ? GetAndroidBundleVersionCode() : 0, Application.version,
+                    Application.identifier, androidGameVersion, Application.unityVersion, nativeSizingSupported);
+
+                defaultScreenHeight = Screen.height;
+                _webViewOriginalUrl = url;
                 _webViewManager = new WebViewManager(webViewObject, defaultScreenHeight);
 
-                webViewObject.SetVisibility(!Application.isEditor);
-                AirConsoleLogger.LogDevelopment(() => $"Initial URL: {url}");
-                webViewObject.LoadURL(url);
-                
-                if (IsAndroidRuntime && _pluginManager != null) {
-                    _pluginManager.OnReloadWebview += () => webViewObject.LoadURL(url); 
-                    _pluginManager.InitializeOfflineCheck();
-                }
-
-                bool isWebviewDebuggable = AndroidIntentUtils.GetIntentExtraBool("webview_debuggable", false);
-                webViewObject.EnableWebviewDebugging(isWebviewDebuggable);
+                LoadAndroidWebviewUrl(url);
 
                 _logPlatformMessages = AndroidIntentUtils.GetIntentExtraBool("log_platform_messages", false);
                 InitWebSockets();
             }
         }
-        
+
+        /// <summary>
+        /// Creates the native webview behind <see cref="webViewObject"/>. Only a player calls this;
+        /// the Editor keeps the WebViewObject headless, see <see cref="CreateAndroidWebview"/>.
+        /// </summary>
+        private void InitNativeWebview() {
+            webViewObject.Init(ProcessJS,
+                err => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView error: {err}"),
+                httpError => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView HttpError: {httpError}"),
+                loadedUrl => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView Loaded URL {loadedUrl}"),
+                started => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView started: {started}"),
+                hooked => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView hooked: {hooked}"),
+                cookies => AirConsoleLogger.LogDevelopment(() => $"AirConsole WebView cookies: {cookies}"),
+                true, false);
+        }
+
+        private void LoadAndroidWebviewUrl(string url) {
+            webViewObject.SetVisibility(!Application.isEditor);
+            AirConsoleLogger.LogDevelopment(() => $"Initial URL: {url}");
+            webViewObject.LoadURL(url);
+
+            if (IsAndroidRuntime) {
+                if (_pluginManager != null) {
+                    if (_reloadWebviewHandler != null) {
+                        _pluginManager.OnReloadWebview -= _reloadWebviewHandler;
+                    }
+
+                    _reloadWebviewHandler = () => webViewObject.LoadURL(url);
+                    _pluginManager.OnReloadWebview += _reloadWebviewHandler;
+                    _pluginManager.InitializeOfflineCheck();
+                }
+
+                bool isWebviewDebuggable = AndroidIntentUtils.GetIntentExtraBool("webview_debuggable", false);
+                webViewObject.EnableWebviewDebugging(isWebviewDebuggable);
+            }
+        }
+
+        private static bool ResolveNativeGameSizingSupport(bool fallback) {
+            AirconsoleRuntimeSettings settings = Resources.Load<AirconsoleRuntimeSettings>(AirconsoleRuntimeSettings.ResourceName);
+            return settings ? settings.NativeGameSizingSupported : fallback;
+        }
+
+        /// <summary>
+        /// Assembles the query string appended to the AirConsole webview URL.
+        /// Pure and free of device dependencies so both the Android and Web paths are unit-testable:
+        /// the caller passes device-derived values (bundle version code, app version, ...).
+        /// The <c>bundle-version</c> and <c>androidAppVersion</c> parameters are only added on the Android runtime.
+        /// </summary>
+        internal static string BuildWebviewUrl(string baseUrl, string connectionUrl, bool isAndroidRuntime,
+            int bundleVersionCode, string appVersion, string gameId, string gameVersion, string unityVersion,
+            bool nativeSizingSupported) {
+            string url = baseUrl + connectionUrl;
+            if (isAndroidRuntime) {
+                url += $"&bundle-version={bundleVersionCode}";
+                url += $"&androidAppVersion={appVersion}";
+            }
+
+            url += "&game-id=" + gameId;
+            url += "&game-version=" + gameVersion;
+            url += "&unity-version=" + unityVersion;
+            url += nativeSizingSupported ? "&supportsNativeGameSizing=true" : "&supportsNativeGameSizing=false";
+            return url;
+        }
+
         private static int GetAndroidBundleVersionCode() {
             AndroidJavaObject ca = UnityAndroidObjectProvider.GetUnityActivity();
             AndroidJavaObject packageManager = ca.Call<AndroidJavaObject>("getPackageManager");
@@ -2021,38 +2356,43 @@ namespace NDream.AirConsole {
             AirConsoleLogger.LogDevelopment(() => $"OnLaunchApp for {msg} -> {gameId} -> {gameVersion}");
 
             if (gameId != Application.identifier || gameVersion != instance.androidGameVersion) {
-                bool quitAfterLaunchIntent = false; // Flag used to force old pre v2.5 way of quitting
-
-                if (msg["quit_after_launch_intent"] != null) {
-                    quitAfterLaunchIntent = msg.SelectToken("quit_after_launch_intent").Value<bool>();
-                }
-
-                // Quit the Unity Player first and give it the time to close all the threads (Default)
-                if (!quitAfterLaunchIntent) {
-                    Application.Quit();
-                    if (_pluginManager == null || !_pluginManager.IsAutomotive()) {
-                        AirConsoleLogger.LogDevelopment(() => $"Quit and sleep for 2000ms");
-                        Thread.Sleep(2000);
-                    } else {
-                        AirConsoleLogger.LogDevelopment(() => $"Quit immediately");
-                    }
-                }
-
-                if (IsAndroidRuntime) {
-                    LaunchNativeAirConsoleStore(msg, gameId, gameVersion);
-                }
-
-                // Quitting after launch intent was the pre v2.5 way
-                if (quitAfterLaunchIntent) {
-                    AirConsoleLogger.LogDevelopment(() => $"Quit after launch intent");
-                    Application.Quit();
-                    return;
-                }
-
-                int timeout = _pluginManager != null && _pluginManager.IsAutomotive() ? 2000 : 2000;
-                Thread.Sleep(timeout);
-                FinishActivity();
+                // Marshal to main thread since this is called from WebSocket background thread
+                eventQueue.Enqueue(() => HandleLaunchAppTransition(msg, gameId, gameVersion));
             }
+        }
+
+        private void HandleLaunchAppTransition(JObject msg, string gameId, string gameVersion) {
+            bool quitAfterLaunchIntent = false; // Flag used to force old pre v2.5 way of quitting
+
+            if (msg["quit_after_launch_intent"] != null) {
+                quitAfterLaunchIntent = msg.SelectToken("quit_after_launch_intent").Value<bool>();
+            }
+
+            // Quit the Unity Player first and give it the time to close all the threads (Default)
+            if (!quitAfterLaunchIntent) {
+                Application.Quit();
+                if (_pluginManager == null || !_pluginManager.IsAutomotive()) {
+                    int waitTime = _pluginManager != null && _pluginManager.IsAutomotive() ? 500 : 2000;
+                    AirConsoleLogger.LogDevelopment(() => $"Quit and wait for {waitTime} milliseconds");
+                    Thread.Sleep(waitTime);
+                } else {
+                    AirConsoleLogger.LogDevelopment(() => $"Quit immediately");
+                }
+            }
+
+            if (IsAndroidRuntime) {
+                LaunchNativeAirConsoleStore(msg, gameId, gameVersion);
+            }
+
+            // Quitting after launch intent was the pre v2.5 way
+            if (quitAfterLaunchIntent) {
+                AirConsoleLogger.LogDevelopment(() => $"Quit after launch intent");
+                Application.Quit();
+                return;
+            }
+
+            Thread.Sleep(_pluginManager != null && _pluginManager.IsAutomotive() ? 500 : 2000);
+            FinishActivity();
         }
 
         private static void LaunchNativeAirConsoleStore(JObject msg, string gameId, string gameVersion) {
@@ -2104,7 +2444,7 @@ namespace NDream.AirConsole {
             int h = Screen.height;
 
             if (msg["top_bar_height"] != null) {
-                h = (int)msg["top_bar_height"] * 2; // todo(android-native): This probably should use the screen dpi scaling factor
+                h = (int)msg["top_bar_height"] * 2; // TODO(android-native): This should use the screen dpi scaling factor
                 webViewHeight = h;
                 _webViewManager.SetWebViewHeight(h);
             }
@@ -2173,6 +2513,153 @@ namespace NDream.AirConsole {
             }
         }
 
+        #region Audio Focus and Volume
+        private bool _nativeGainedAudioFocus;
+        private bool _canIgnoreNativeAudioLoss = true;
+
+        private void HandleOnMaxVolumeChanged(float newMaximumVolume) {
+            MaximumAudioVolume = Mathf.Clamp01(_canHaveAudioFocus ? newMaximumVolume : 0f);
+            AirConsoleLogger.LogDevelopment(() =>
+                $"HandleOnMaxVolumeChanged({newMaximumVolume}) -> {MaximumAudioVolume}. No action taken.");
+        }
+
+        // TODO(QAB-14400, QAB-14401, QAB-14403): There are edge cases left regarding _ignoreAudioFocusLoss which is true from onGameEnd -> onReady?
+        private void HandleAudioFocusChange(bool canHaveAudioFocus, bool shallMuteWebview) {
+            AirConsoleLogger.LogDevelopment(() => $"HandleAudioFocusChanged({canHaveAudioFocus})");
+
+            if (!canHaveAudioFocus && _ignoreAudioFocusLoss) {
+                AirConsoleLogger.LogDevelopment(() => "Ignoring audio focus loss until the game is ready.");
+                return;
+            }
+
+            // TODO(PRO-1637): Implement a more complete state machine to handle audio focus changes correctly.
+            _canHaveAudioFocus = canHaveAudioFocus;
+            if (!canHaveAudioFocus) {
+                AirConsoleLogger.LogError(() => "Can have audio focus lost.");
+            }
+
+            MaximumAudioVolume = canHaveAudioFocus ? 1f : 0f;
+            eventQueue.Enqueue(() => OnGameAudioFocusChanged?.Invoke(canHaveAudioFocus, MaximumAudioVolume));
+        }
+
+        // Webview Audio Focus change handler
+        private void HandleWebViewAudioFocusChanged(string command) {
+            HandlePlatformAudioFocusChanged(command);
+        }
+
+        private void HandleNativeAudioFocusChanged(string command) {
+            HandlePlatformAudioFocusChanged(command);
+        }
+
+        private void HandlePlatformAudioFocusChanged(string command) {
+            AirConsoleLogger.LogDevelopment(() => $"HandlePlatformAudioFocusChanged('{command}')");
+            if (string.IsNullOrEmpty(command)) {
+                AirConsoleLogger.LogError(() => "Audio focus command was null or empty.");
+                return;
+            }
+
+            if (command.StartsWith("WEBVIEW_AUDIOFOCUS_", StringComparison.Ordinal)) {
+                HandleWebViewAudioFocusEvent(command);
+                return;
+            }
+
+            if (command.StartsWith("NATIVE_AUDIOFOCUS_", StringComparison.Ordinal)) {
+                HandleNativeAudioFocusEvent(command);
+                return;
+            }
+
+            AirConsoleLogger.LogError(() => $"Unknown audio focus command: {command}");
+        }
+
+        private void HandleWebViewAudioFocusEvent(string command) {
+            switch (command) {
+                case "WEBVIEW_AUDIOFOCUS_START":
+                    break;
+                case "WEBVIEW_AUDIOFOCUS_STOP":
+                    break;
+                case "WEBVIEW_AUDIOFOCUS_GAIN":
+                case "WEBVIEW_AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE":
+                case "WEBVIEW_AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK":
+                case "WEBVIEW_AUDIOFOCUS_GAIN_TRANSIENT":
+                    AirConsoleLogger.Log(() =>
+                        $"{command}: Can ignore native loss={_canIgnoreNativeAudioLoss}");
+                    HasAudioFocus = true;
+                    _ignoreAudioFocusLoss = true;
+                    break;
+                case "WEBVIEW_AUDIOFOCUS_LOSS":
+                    AirConsoleLogger.Log(() =>
+                        $"{command}: Can ignore native loss={_canIgnoreNativeAudioLoss}");
+
+                    if (_nativeGainedAudioFocus) {
+                        return;
+                    }
+
+                    _ignoreAudioFocusLoss = false;
+                    HandleAudioFocusChange(false, true);
+                    break;
+
+                case "WEBVIEW_AUDIOFOCUS_LOSS_TRANSIENT":
+                case "WEBVIEW_AUDIOFOCUS_LOSS_CAN_DUCK":
+                    break;
+
+                // This is fired when we ask the webview to abandon audio focus.
+                case "WEBVIEW_AUDIOFOCUS_ABANDON":
+                    break;
+
+                default:
+                    AirConsoleLogger.LogError(() => $"Unknown audio focus command from webview: {command}");
+                    break;
+            }
+        }
+
+        private void HandleNativeAudioFocusEvent(string command) {
+            switch (command) {
+                case "NATIVE_AUDIOFOCUS_GAIN":
+                case "NATIVE_AUDIOFOCUS_GAIN_TRANSIENT":
+                case "NATIVE_AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE":
+                case "NATIVE_AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK":
+                    AirConsoleLogger.Log(() =>
+                        $"{command}: Can ignore native loss={_canIgnoreNativeAudioLoss}");
+                    HasAudioFocus = true;
+                    _ignoreAudioFocusLoss = false;
+                    _nativeGainedAudioFocus = true;
+
+                    HandleAudioFocusChange(true, true);
+
+                    break;
+
+                case "NATIVE_AUDIOFOCUS_LOSS":
+                    AirConsoleLogger.Log(() =>
+                        $"{command}: Can ignore native loss={_canIgnoreNativeAudioLoss}");
+
+                    if (_canIgnoreNativeAudioLoss) {
+                        _canIgnoreNativeAudioLoss = false;
+                        return;
+                    }
+
+                    _nativeGainedAudioFocus = false;
+                    _ignoreAudioFocusLoss = false;
+                    HandleAudioFocusChange(false, true);
+
+                    break;
+                case "NATIVE_AUDIOFOCUS_LOSS_TRANSIENT":
+                case "NATIVE_AUDIOFOCUS_LOSS_CAN_DUCK":
+                    break;
+                case "NATIVE_AUDIOFOCUS_ABANDON":
+                    _nativeGainedAudioFocus = false;
+                    _ignoreAudioFocusLoss = false;
+                    HandleAudioFocusChange(true, false);
+                    break;
+
+                case "NATIVE_AUDIOFOCUS_NONE":
+                    break;
+                default:
+                    AirConsoleLogger.LogError(() => $"Unknown audio focus command from native plugin: {command}");
+                    break;
+            }
+        }
+        #endregion Audio Focus and Volume
+
         /// <summary>
         /// Called when there is an update for the content provider.
         /// </summary>
@@ -2204,17 +2691,9 @@ namespace NDream.AirConsole {
             !string.IsNullOrEmpty((string)msg[name])
                 ? (float)msg[name]
                 : defaultValue;
-
         #endregion
 
         #region AirConsole Internal
-
-        internal event Action<bool> OnApplicationFocusChanged;
-
-        private void OnApplicationFocus(bool hasFocus) {
-            OnApplicationFocusChanged?.Invoke(hasFocus);
-        }
-
         /// <summary>
         /// Sends a message to the platform.
         /// </summary>
@@ -2226,7 +2705,6 @@ namespace NDream.AirConsole {
 
             wsListener.Message(msg);
         }
-
         #endregion AirConsole Internal
 
 #endif

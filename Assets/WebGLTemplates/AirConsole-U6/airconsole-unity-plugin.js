@@ -1,6 +1,6 @@
 /**
  * Copyright by N-Dream AG 2025.
- * @version 2.6.0
+ * @version 2.6.2
  */
 
 /**
@@ -9,10 +9,16 @@
 
 function App(container, canvas, web_config, progress_config) {
     var me = this;
-
+    
+    // TODO(PRO-1804): Remove this workaround when Android TV uses a fullscreen webview too
+    const isAndroidTV = window.location.search.includes('androidTv=1');
+    window.AIRCONSOLE_ANDROID_NATIVE_GAMESIZING = window.AIRCONSOLE_ANDROID_NATIVE_GAMESIZING && !isAndroidTV;
+    
     me.is_native_app = typeof Unity != "undefined";
     me.is_editor = !!me.getURLParameterByName("unity-editor-websocket-port");
-    me.top_bar_height = window.outerHeight - window.innerHeight;
+    if (!window.AIRCONSOLE_ANDROID_NATIVE_GAMESIZING) {
+        me.top_bar_height = window.outerHeight - window.innerHeight;
+    }
     me.is_unity_ready = false;
     me.queue = false;
     me.game_container = container;
@@ -91,15 +97,18 @@ App.prototype.updateProgressBar = function(progress_bar, progress) {
 
 App.prototype.startNativeApp = function() {
     var me = this;
+    
     me.game_container.style.display = 'none';
     me.is_unity_ready = true;
     window.onbeforeunload = function() {
         Unity.call(JSON.stringify({ action: "onGameEnd" }));
-    };
-    Unity.call(JSON.stringify({
-        action: "onUnityWebviewResize",
-        top_bar_height: me.top_bar_height,
-    }));
+    }
+    if (!window.AIRCONSOLE_ANDROID_NATIVE_GAMESIZING) {;
+        Unity.call(JSON.stringify({
+            action: "onUnityWebviewResize",
+            top_bar_height: me.top_bar_height,
+        }));
+    }
     // forward WebView postMessage data from parent window
     window.addEventListener("message", function (event) {
         if (event.data["action"] == "androidunity") {
@@ -188,7 +197,8 @@ App.prototype.initAirConsole = function() {
             "server_time_offset": me.airconsole.server_time_offset,
             "location": document.location.href,
             "translations": me.airconsole.translations,
-            "gameSafeArea": me.airconsole.gameSafeArea
+            "gameSafeArea": me.airconsole.gameSafeArea,
+            "gameConfiguration": me.airconsole.gameConfiguration
         });
     };
 

@@ -24,10 +24,13 @@ namespace NDream.Unity {
             string outputPath = Path.GetFullPath(Path.Combine("Builds", $"airconsole-unity-plugin-v{Settings.VERSION}.unitypackage"));
             ExportPackage(outputPath);
             DeleteOldUnityPackages(outputPath, Settings.VERSION);
-
-            AddPackageToGit();
-
-            OpenPath(outputPath);
+            // Batch mode stages nothing: in CI and scripts/release_local.py, scripts/release.py stages the files, and
+            // unity-stack.sh package is a test export. git in the root-run Unity container could also leave
+            // root-owned objects in .git.
+            if (!Application.isBatchMode) {
+                AddPackageToGit();
+                OpenPath(outputPath);
+            }
         }
 
         [MenuItem("Tools/AirConsole/Package Plugin Release Candidate")]
@@ -49,7 +52,7 @@ namespace NDream.Unity {
         }
 
         private static void RemoveControllersFromWebGlTemplates() => Directory
-            .GetFiles(Path.Combine(Application.dataPath, "WebGlTemplates"), "controller.html", SearchOption.AllDirectories)
+            .GetFiles(Path.Combine(Application.dataPath, "WebGLTemplates"), "controller.html", SearchOption.AllDirectories)
             .ToList()
             .ForEach(File.Delete);
 
@@ -80,27 +83,6 @@ namespace NDream.Unity {
             Debug.ClearDeveloperConsole();
             AirConsoleLogger.Log(() => $"Exporting to {outputPath}");
 
-            string packageCache = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "PackageCache"));
-            string webviewPackagePath =
-                Directory.GetDirectories(packageCache).FirstOrDefault(d => d.Contains("com.airconsole.unity-webview"));
-
-            if (!Directory.Exists(webviewPackagePath)) {
-                EditorUtility.DisplayDialog("Error", "Can not find airconsole webview package", "OK");
-                AirConsoleLogger.LogError(() => "Can not find airconsole webview package");
-                return;
-            }
-
-            string webviewPackagePathAssets = Path.Combine(webviewPackagePath, "Assets");
-
-            string targetPath = Path.GetFullPath(Path.Combine(Application.dataPath, "AirConsole", "unity-webview"));
-            DeleteAssetDatabaseDirectory(targetPath);
-            AssetDatabase.Refresh();
-
-            EditorApplication.LockReloadAssemblies();
-
-            MoveSubDirectories(webviewPackagePathAssets, targetPath);
-            File.Move(Path.Combine(webviewPackagePath, "unity-webview.asmdef"), Path.Combine(targetPath, "unity-webview.asmdef"));
-            File.Move(Path.Combine(webviewPackagePath, "unity-webview.asmdef.meta"), Path.Combine(targetPath, "unity-webview.asmdef.meta"));
             RemoveControllersFromWebGlTemplates();
             RemoveAirConsolePreferences();
             AssetDatabase.Refresh();
@@ -110,13 +92,8 @@ namespace NDream.Unity {
             CollectPackageInclusionPaths(packagePath, out IEnumerable<string> packageInclusionPaths);
             AssetDatabase.ExportPackage(packageInclusionPaths.ToArray(), outputPath, ExportPackageOptions.Recurse);
 
-            File.Move(Path.Combine(targetPath, "unity-webview.asmdef"), Path.Combine(webviewPackagePath, "unity-webview.asmdef"));
-            File.Move(Path.Combine(targetPath, "unity-webview.asmdef.meta"), Path.Combine(webviewPackagePath, "unity-webview.asmdef.meta"));
-            MoveSubDirectories(targetPath, webviewPackagePathAssets);
-            DeleteAssetDatabaseDirectory(targetPath);
             CleanupCodePackage();
-            AssetDatabase.Refresh();
-            EditorApplication.UnlockReloadAssemblies();
+            
             Debug.ClearDeveloperConsole();
         }
 
@@ -176,8 +153,19 @@ namespace NDream.Unity {
         private static void CleanupCodePackage() {
             string unityPackagePath = ProjectCodeUpdater.CodePackagePath;
 
-            if (File.Exists(unityPackagePath)) {
+            if (!File.Exists(unityPackagePath)) {
+                return;
+            }
+
+            // DeleteAsset, not File.Delete: PackageCode writes this package inside Assets/ and the
+            // following Refresh imports it, so Unity owns a .meta for it. File.Delete removes only
+            // the package and leaves airconsole-code.unitypackage.meta orphaned in the repository.
+            string assetPath = unityPackagePath.Replace(Application.dataPath, "Assets");
+            if (!AssetDatabase.DeleteAsset(assetPath)) {
                 File.Delete(unityPackagePath);
+                AirConsoleLogger.LogWarning(() =>
+                    $"Could not delete {assetPath} through the AssetDatabase; removed the file directly. "
+                    + "Check for a leftover .meta.");
             }
         }
 
@@ -188,7 +176,7 @@ namespace NDream.Unity {
         private static void AddPackageToGit() {
             ProcessStartInfo startInfo = new() {
                 FileName = "git",
-                Arguments = $"add {Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "airconsole-unity-plugin-v*"))}"
+                Arguments = $"add \"{Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "airconsole-unity-plugin-v*"))}\""
             };
             Process proc = new() {
                 StartInfo = startInfo
