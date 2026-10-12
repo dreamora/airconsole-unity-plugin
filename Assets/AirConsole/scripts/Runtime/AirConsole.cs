@@ -57,6 +57,8 @@ namespace NDream.AirConsole {
 
     public delegate void OnPersistentDataLoaded(JToken data);
 
+    public delegate void OnPhotonEngineAuth(string ticket);
+
     public delegate void OnPremium(int deviceId);
 
     public delegate void OnPause();
@@ -249,6 +251,12 @@ namespace NDream.AirConsole {
         /// </summary>
         /// <param name="data">An object mapping uids to all key value pairs.</param>
         public event OnPersistentDataLoaded onPersistentDataLoaded;
+
+        /// <summary>
+        /// Gets called when RequestPhotonEngineAuth() finished.
+        /// </summary>
+        /// <param name="ticket">The Photon auth ticket, or null if the request failed.</param>
+        public event OnPhotonEngineAuth OnPhotonEngineAuth;
 
         /// <summary>
         /// Gets called when a device becomes premium or when a premium device connects.
@@ -1023,6 +1031,21 @@ namespace NDream.AirConsole {
         }
 
         /// <summary>
+        /// Requests a short-lived ticket for Photon Custom Authentication.
+        /// Pass it to Photon with <c>AuthenticationValues.AddAuthParameter("ticket", ticket)</c>.
+        /// Request a new ticket for every connection attempt: tickets expire after 15 minutes.
+        /// Requires airconsole-api 1.12.0 or newer. Will call OnPhotonEngineAuth when done.
+        /// </summary>
+        /// <exception cref="NotReadyException">Thrown if the AirConsole Unity Plugin is not ready.</exception>
+        public void RequestPhotonEngineAuth() {
+            if (!IsAirConsoleUnityPluginReady()) {
+                throw new NotReadyException();
+            }
+
+            wsListener.Message(new JObject { { "action", "requestPhotonEngineAuth" } });
+        }
+
+        /// <summary>
         /// Stores a key-value pair persistently on the AirConsole servers.
         /// Storage is per game. Total storage can not exceed 1 MB per game and uid.
         /// Will call onPersistentDataStored when the request is done.
@@ -1231,6 +1254,7 @@ namespace NDream.AirConsole {
             wsListener.onHighScoreStored += OnHighScoreStored;
             wsListener.onPersistentDataStored += OnPersistentDataStored;
             wsListener.onPersistentDataLoaded += OnPersistentDataLoaded;
+            wsListener.OnPhotonEngineAuth += HandlePhotonEngineAuth;
             wsListener.onPremium += OnPremium;
             wsListener.onPause += OnPause;
             wsListener.onResume += OnResume;
@@ -1350,8 +1374,10 @@ namespace NDream.AirConsole {
         public static T ACFindObjectOfType<T>() where T : UnityEngine.Object {
 #if !UNITY_6000_0_OR_NEWER
             return FindObjectOfType<T>();
-#else
+#elif !UNITY_6000_6_OR_NEWER
             return FindFirstObjectByType<T>();
+#else
+            return FindAnyObjectByType<T>();
 #endif
         }
         #endregion
@@ -1714,6 +1740,7 @@ namespace NDream.AirConsole {
             wsListener.onHighScoreStored -= OnHighScoreStored;
             wsListener.onPersistentDataStored -= OnPersistentDataStored;
             wsListener.onPersistentDataLoaded -= OnPersistentDataLoaded;
+            wsListener.OnPhotonEngineAuth -= HandlePhotonEngineAuth;
             wsListener.onPremium -= OnPremium;
             wsListener.onPause -= OnPause;
             wsListener.onResume -= OnResume;
@@ -1870,6 +1897,11 @@ namespace NDream.AirConsole {
                     AirConsoleLogger.LogError(() => e.Message);
                 }
             }
+        }
+
+        private void HandlePhotonEngineAuth(JObject msg) {
+            string ticket = (string)msg["ticket"];
+            eventQueue.Enqueue(delegate() { OnPhotonEngineAuth?.Invoke(ticket); });
         }
 
         private void OnPersistentDataLoaded(JObject msg) {
@@ -2497,7 +2529,14 @@ namespace NDream.AirConsole {
                 return;
             }
 
+#if UNITY_6000_6_OR_NEWER
+            UnityEngine.UI.CanvasScaler[] allCanvasScalers = FindObjectsByType<UnityEngine.UI.CanvasScaler>();
+#elif UNITY_6000_0_OR_NEWER
+            UnityEngine.UI.CanvasScaler[] allCanvasScalers
+                = FindObjectsByType<UnityEngine.UI.CanvasScaler>(FindObjectsSortMode.None);
+#else
             UnityEngine.UI.CanvasScaler[] allCanvasScalers = FindObjectsOfType<UnityEngine.UI.CanvasScaler>();
+#endif
 
             for (int i = 0; i < allCanvasScalers.Length; ++i) {
                 if (fixedCanvasScalers.Contains(allCanvasScalers[i])) {
