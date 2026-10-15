@@ -1,0 +1,191 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <ui:ScrollView name="main-scroll-view" class="main-scroll-view">
+        <ui:Label text="AirConsole Project Optimizer" name="header" class="header" />
+        <ui:Label text="Optimize your project for AirConsole web and Android platforms" name="description" class="description" />
+        <ui:Button text="Apply All Recommendations" name="apply-all-button" class="apply-all-button" />
+        
+        <!-- WebGL Section -->
+        <ui:Label text="WebGL Recommendations" name="webgl-header" class="section-header" />
+        <ui:VisualElement name="webgl-recommendations" class="recommendations-container">
+            <ui:VisualElement name="data-caching" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Data Caching" class="recommendation-title" />
+                    <ui:Label text="Should be disabled to avoid interference with automotive requirements" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="memory-growth-mode" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Memory Growth Mode" class="recommendation-title" />
+                    <ui:Label text="Should be set to None for performance and stability on automotive" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="initial-memory-size" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Initial Memory Size" class="recommendation-title" />
+                    <ui:Label text="Should stay at or below 512MB for automotive compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="name-files-as-hashes" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Name Files As Hashes" class="recommendation-title" />
+                    <ui:Label text="Should be disabled as we upload into timestamp based folders" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="webgl-scripting-backend" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Scripting Backend" class="recommendation-title" />
+                    <ui:Label text="Should be set to IL2CPP for WebGL" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        
+        <!-- Android Section -->
+        <ui:Label text="Android Recommendations" name="android-header" class="section-header" />
+        <ui:VisualElement name="android-recommendations" class="recommendations-container">
+            <ui:VisualElement name="multithreaded-rendering" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Multithreaded Rendering" class="recommendation-title" />
+                    <ui:Label text="Ensures optimal performance and thermal load" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="preferred-install-location" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Preferred Install Location" class="recommendation-title" />
+                    <ui:Label text="Should be set to Auto for best compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="vulkan-swapchain-buffers" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Vulkan Swapchain Buffers" class="recommendation-title" />
+                    <ui:Label text="Must contain at least 3 buffers for proper rendering" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="optimized-frame-pacing" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Optimized Frame Pacing" class="recommendation-title" />
+                    <ui:Label text="Improves frame consistency and performance on Android" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="target-architecture" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Target Architecture" class="recommendation-title" />
+                    <ui:Label text="Should include both ARM64 and ARMv7 for compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="android-scripting-backend" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Scripting Backend" class="recommendation-title" />
+                    <ui:Label text="Should be set to IL2CPP for Android" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="target-sdk-version" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Target SDK Version" class="recommendation-title" />
+                    <ui:Label text="Should be at least 34 for Google Play compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        
+        <!-- General Section -->
+        <ui:Label text="General Recommendations" name="general-header" class="section-header" />
+        <ui:VisualElement name="general-recommendations" class="recommendations-container">
+            <ui:VisualElement name="run-in-background" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Run In Background" class="recommendation-title" />
+                    <ui:Label text="Platform-dependent background running configuration" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="mute-other-audio-sources" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Mute Other Audio Sources" class="recommendation-title" />
+                    <ui:Label text="Should be disabled for automotive compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="allow-unsafe-code" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Allow Unsafe Code" class="recommendation-title" />
+                    <ui:Label text="Should be disabled to ensure automotive platform compatibility" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="reset-resolution-on-window-resize" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Reset Resolution On Window Resize" class="recommendation-title" />
+                    <ui:Label text="Should be enabled for proper window handling" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+            
+            <ui:VisualElement name="unity-logo-splash-screen" class="recommendation-item">
+                <ui:VisualElement class="status-indicator" />
+                <ui:VisualElement class="content-container">
+                    <ui:Label text="Unity Logo in Splash Screen" class="recommendation-title" />
+                    <ui:Label text="Should be disabled for cleaner presentation" class="recommendation-description" />
+                </ui:VisualElement>
+                <ui:Button text="Apply" class="apply-button" />
+                <ui:Label text="✓" class="status-checkmark" style="display: none;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        
+        <ui:Button text="Refresh Recommendations" name="refresh-button" class="refresh-button" />
+    </ui:ScrollView>
+</ui:UXML>
